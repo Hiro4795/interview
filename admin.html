@@ -2,38 +2,53 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8">
-  <title>면접 번호 호출</title>
+  <title>번호 호출 관리자</title>
   <style>
     body {
       font-family: Arial, sans-serif;
-      text-align: center;
       background: #f4f6f8;
-      margin: 0;
-    }
-    h1 { font-size: 40px; margin-top: 40px; }
-    input {
-      font-size: 40px;
-      width: 200px;
       text-align: center;
-      padding: 10px;
+      margin: 0;
+      padding: 20px;
+    }
+    h1 { font-size: 36px; }
+    input {
+      font-size: 24px;
+      width: 100px;
+      margin: 5px;
+      text-align: center;
     }
     button {
-      font-size: 30px;
-      padding: 15px 40px;
-      margin: 20px;
+      font-size: 22px;
+      padding: 10px 20px;
+      margin: 5px;
       cursor: pointer;
+    }
+    #numbers {
+      margin-top: 20px;
+    }
+    .num-btn {
+      font-size: 22px;
+      width: 60px;
+      height: 60px;
+      margin: 5px;
     }
   </style>
 </head>
 <body>
 
-<h1>호출할 번호 입력</h1>
+<h1>호출 번호 관리</h1>
 
-<input type="number" id="callNumber" placeholder="번호"><br>
+<input type="number" id="start" placeholder="시작">
+~
+<input type="number" id="end" placeholder="끝">
+<br>
+<button onclick="makeRange()">범위 생성</button>
+<button onclick="resetCalled()">초기화</button>
 
-<button onclick="call()">번호 호출</button>
+<div id="numbers"></div>
 
-<!-- Firebase SDK -->
+<!-- Firebase -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 
@@ -41,27 +56,46 @@
   const firebaseConfig = {
     apiKey: "AIzaSyC0vy7CRKb0eCe3uflueVjVZmBbJjiL8Eo",
     authDomain: "shucall1.firebaseapp.com",
-    projectId: "shucall1",
-    storageBucket: "shucall1.firebasestorage.app",
-    messagingSenderId: "493600891772",
-    appId: "1:493600891772:web:84ced7c30f7a0dd48e3af9"
+    projectId: "shucall1"
   };
 
   firebase.initializeApp(firebaseConfig);
-
   const db = firebase.firestore();
   const ref = db.collection("queue").doc("current");
 
-  function call() {
-    const num = document.getElementById("callNumber").value;
-
-    if (!num) {
-      alert("번호를 입력하세요");
+  // 범위 버튼 생성
+  function makeRange() {
+    const s = Number(start.value);
+    const e = Number(end.value);
+    if (!s || !e || s > e) {
+      alert("범위를 올바르게 입력하세요");
       return;
     }
 
-    ref.set({ number: Number(num) });
-    document.getElementById("callNumber").value = "";
+    const area = document.getElementById("numbers");
+    area.innerHTML = "";
+
+    for (let i = s; i <= e; i++) {
+      const btn = document.createElement("button");
+      btn.innerText = i;
+      btn.className = "num-btn";
+      btn.onclick = () => callNumber(i);
+      area.appendChild(btn);
+    }
+  }
+
+  // 번호 호출 (배열에 추가)
+  function callNumber(num) {
+    ref.set({
+      called: firebase.firestore.FieldValue.arrayUnion(num)
+    }, { merge: true });
+  }
+
+  // 초기화 (배열 비우기)
+  function resetCalled() {
+    if (confirm("호출 목록을 초기화할까요?")) {
+      ref.set({ called: [] });
+    }
   }
 </script>
 

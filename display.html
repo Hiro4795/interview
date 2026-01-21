@@ -2,29 +2,29 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8">
-  <title>번호 호출 오버레이</title>
+  <title>번호 호출 표시</title>
   <style>
     body {
-      background: rgba(0,0,0,0); /* 투명 */
-      color: red;
+      background: black;
+      color: white;
       font-family: Arial, sans-serif;
       margin: 0;
-      padding: 0;
-      overflow: hidden;
+      padding: 30px;
     }
-    #number {
-      position: fixed;
-      top: 30px;
-      right: 50px;
-      font-size: 120px;
-      font-weight: bold;
-      text-shadow: 3px 3px 6px black;
+    h1 {
+      font-size: 40px;
+      margin-bottom: 20px;
+    }
+    #list {
+      font-size: 80px;
+      line-height: 1.4;
     }
   </style>
 </head>
 <body>
 
-<div id="number">-</div>
+<h1>호출 번호</h1>
+<div id="list">-</div>
 
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
@@ -40,10 +40,16 @@
   const db = firebase.firestore();
   const ref = db.collection("queue").doc("current");
 
-  ref.onSnapshot((doc) => {
-    if (doc.exists) {
-      document.getElementById("number").innerText = doc.data().number;
+  ref.onSnapshot(doc => {
+    const data = doc.data();
+    const list = document.getElementById("list");
+
+    if (!data || !data.called || data.called.length === 0) {
+      list.innerText = "-";
+      return;
     }
+
+    list.innerHTML = data.called.join("<br>");
   });
 </script>
 
