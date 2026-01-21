@@ -33,6 +33,11 @@
       height: 60px;
       margin: 5px;
     }
+    .num-btn:disabled {
+      background: #ccc;
+      color: #666;
+      cursor: not-allowed;
+    }
   </style>
 </head>
 <body>
@@ -48,7 +53,6 @@
 
 <div id="numbers"></div>
 
-<!-- Firebase -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 
@@ -63,10 +67,13 @@
   const db = firebase.firestore();
   const ref = db.collection("queue").doc("current");
 
-  // 범위 버튼 생성
+  let buttons = {};
+
+  // 범위 생성
   function makeRange() {
     const s = Number(start.value);
     const e = Number(end.value);
+
     if (!s || !e || s > e) {
       alert("범위를 올바르게 입력하세요");
       return;
@@ -74,6 +81,7 @@
 
     const area = document.getElementById("numbers");
     area.innerHTML = "";
+    buttons = {};
 
     for (let i = s; i <= e; i++) {
       const btn = document.createElement("button");
@@ -81,22 +89,39 @@
       btn.className = "num-btn";
       btn.onclick = () => callNumber(i);
       area.appendChild(btn);
+      buttons[i] = btn;
     }
   }
 
-  // 번호 호출 (배열에 추가)
+  // 번호 호출
   function callNumber(num) {
     ref.set({
       called: firebase.firestore.FieldValue.arrayUnion(num)
     }, { merge: true });
+
+    buttons[num].disabled = true;
   }
 
-  // 초기화 (배열 비우기)
+  // 초기화
   function resetCalled() {
-    if (confirm("호출 목록을 초기화할까요?")) {
-      ref.set({ called: [] });
-    }
+    if (!confirm("호출 목록을 초기화할까요?")) return;
+
+    ref.set({ called: [] });
+
+    Object.values(buttons).forEach(btn => {
+      btn.disabled = false;
+    });
   }
+
+  // 새로고침/재접속 시 상태 동기화
+  ref.onSnapshot(doc => {
+    if (!doc.exists || !doc.data().called) return;
+    const called = doc.data().called;
+
+    Object.keys(buttons).forEach(num => {
+      buttons[num].disabled = called.includes(Number(num));
+    });
+  });
 </script>
 
 </body>
