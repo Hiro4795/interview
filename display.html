@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>면접 대기 화면</title>
+  <style>
+    body {
+      background: black;
+      color: white;
+      font-family: Arial, sans-serif;
+      text-align: center;
+      margin-top: 150px;
+    }
+    .title { font-size: 50px; }
+    .number { font-size: 200px; margin: 40px 0; }
+    .msg { font-size: 40px; }
+  </style>
+</head>
+<body>
+
+<div class="title">현재 호출 번호</div>
+<div class="number" id="number">-</div>
+<div class="msg">○번 지원자 입실 바랍니다</div>
+
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+
+<script>
+// Import the functions you need from the SDKs you need
+import { initializeApp } from "firebase/app";
+import { getAnalytics } from "firebase/analytics";
+// TODO: Add SDKs for Firebase products that you want to use
+// https://firebase.google.com/docs/web/setup#available-libraries
+
+// Your web app's Firebase configuration
+// For Firebase JS SDK v7.20.0 and later, measurementId is optional
+const firebaseConfig = {
+  apiKey: "AIzaSyC0vy7CRKb0eCe3uflueVjVZmBbJjiL8Eo",
+  authDomain: "shucall1.firebaseapp.com",
+  projectId: "shucall1",
+  storageBucket: "shucall1.firebasestorage.app",
+  messagingSenderId: "493600891772",
+  appId: "1:493600891772:web:84ced7c30f7a0dd48e3af9",
+  measurementId: "G-5W2DGTRM59"
+};
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+const analytics = getAnalytics(app);
+
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.firestore();
+  const ref = db.collection("queue").doc("current");
+
+  ref.onSnapshot(doc => {
+    document.getElementById("number").innerText = doc.data().number;
+  });
+</script>
+
+</body>
+</html>
