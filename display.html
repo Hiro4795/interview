@@ -56,35 +56,16 @@
   let soundEnabled = false;
   let lastCalled = [];
 
+  // 🔊 소리 활성화 (버튼 즉시 제거, play 성공 여부와 무관)
   function enableSound() {
-    audio.play().then(() => {
-      audio.pause();
-      audio.currentTime = 0;
-      soundEnabled = true;
-      document.getElementById("soundBtn").style.display = "none";
-    });
+    soundEnabled = true;
+    document.getElementById("soundBtn").style.display = "none";
+
+    audio.muted = false;
+    audio.currentTime = 0;
+    audio.play().catch(err => console.log("오디오 활성화:", err));
   }
 
+  // Firestore 감시
   ref.onSnapshot(doc => {
-    const list = document.getElementById("list");
-
-    if (!doc.exists || !doc.data().called || doc.data().called.length === 0) {
-      list.innerText = "-";
-      lastCalled = [];
-      return;
-    }
-
-    list.innerHTML = doc.data().called.join("<br>");
-
-    // 새 번호 추가 시 호출음
-    if (soundEnabled && doc.data().called.length > lastCalled.length) {
-      audio.currentTime = 0;
-      audio.play();
-    }
-
-    lastCalled = [...doc.data().called];
-  });
-</script>
-
-</body>
-</html>
+    const list = document.getElementById("l
