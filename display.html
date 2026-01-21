@@ -68,4 +68,27 @@
 
   // Firestore 감시
   ref.onSnapshot(doc => {
-    const list = document.getElementById("l
+    const list = document.getElementById("list");
+
+    if (!doc.exists || !doc.data().called || doc.data().called.length === 0) {
+      list.innerText = "-";
+      lastCalled = [];
+      return;
+    }
+
+    list.innerHTML = doc.data().called.join("<br>");
+
+    // 새 번호 추가 시 호출음
+    if (soundEnabled && doc.data().called.length > lastCalled.length) {
+      audio.pause();
+      audio.currentTime = 0;
+      audio.muted = false;
+      audio.play().catch(err => console.log("호출음 재생:", err));
+    }
+
+    lastCalled = [...doc.data().called];
+  });
+</script>
+
+</body>
+</html>

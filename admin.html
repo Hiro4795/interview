@@ -113,7 +113,7 @@
     });
   }
 
-  // 새로고침/재접속 시 상태 동기화
+  // 새로고침 / 재접속 시 상태 동기화
   ref.onSnapshot(doc => {
     if (!doc.exists || !doc.data().called) return;
     const called = doc.data().called;
