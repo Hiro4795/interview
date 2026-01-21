@@ -2,35 +2,30 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8">
-  <title>면접 대기 화면</title>
+  <title>번호 호출 오버레이</title>
   <style>
     body {
-      background: black;
-      color: white;
+      background: rgba(0,0,0,0); /* 투명 */
+      color: red;
       font-family: Arial, sans-serif;
-      text-align: center;
       margin: 0;
-      padding-top: 120px;
+      padding: 0;
+      overflow: hidden;
     }
-    .title {
-      font-size: 48px;
-    }
-    .number {
-      font-size: 200px;
-      margin: 40px 0;
-    }
-    .msg {
-      font-size: 40px;
+    #number {
+      position: fixed;
+      top: 30px;
+      right: 50px;
+      font-size: 120px;
+      font-weight: bold;
+      text-shadow: 3px 3px 6px black;
     }
   </style>
 </head>
 <body>
 
-<div class="title">현재 호출 번호</div>
-<div class="number" id="number">-</div>
-<div class="msg">○번 지원자 입실 바랍니다</div>
+<div id="number">-</div>
 
-<!-- Firebase SDK (admin과 동일) -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 
@@ -38,18 +33,13 @@
   const firebaseConfig = {
     apiKey: "AIzaSyC0vy7CRKb0eCe3uflueVjVZmBbJjiL8Eo",
     authDomain: "shucall1.firebaseapp.com",
-    projectId: "shucall1",
-    storageBucket: "shucall1.firebasestorage.app",
-    messagingSenderId: "493600891772",
-    appId: "1:493600891772:web:84ced7c30f7a0dd48e3af9"
+    projectId: "shucall1"
   };
 
   firebase.initializeApp(firebaseConfig);
-
   const db = firebase.firestore();
   const ref = db.collection("queue").doc("current");
 
-  // 번호 실시간 표시
   ref.onSnapshot((doc) => {
     if (doc.exists) {
       document.getElementById("number").innerText = doc.data().number;

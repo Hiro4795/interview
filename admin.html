@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8">
-  <title>면접 번호 조작</title>
+  <title>면접 번호 호출</title>
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -10,37 +10,34 @@
       background: #f4f6f8;
       margin: 0;
     }
-    h1 {
+    h1 { font-size: 40px; margin-top: 40px; }
+    input {
       font-size: 40px;
-      margin-top: 40px;
-    }
-    #number {
-      font-size: 90px;
-      margin: 40px 0;
+      width: 200px;
+      text-align: center;
+      padding: 10px;
     }
     button {
-      font-size: 32px;
-      padding: 20px 50px;
-      margin: 12px;
+      font-size: 30px;
+      padding: 15px 40px;
+      margin: 20px;
       cursor: pointer;
     }
   </style>
 </head>
 <body>
 
-<h1>현재 호출 번호</h1>
-<div id="number">-</div>
+<h1>호출할 번호 입력</h1>
 
-<button onclick="nextNumber()">다음 번호</button><br>
-<button onclick="prevNumber()">이전 번호</button><br>
-<button onclick="resetNumber()">초기화</button>
+<input type="number" id="callNumber" placeholder="번호"><br>
 
-<!-- Firebase SDK (compat 방식만 사용) -->
+<button onclick="call()">번호 호출</button>
+
+<!-- Firebase SDK -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 
 <script>
-  /* 🔥 Firebase 설정 */
   const firebaseConfig = {
     apiKey: "AIzaSyC0vy7CRKb0eCe3uflueVjVZmBbJjiL8Eo",
     authDomain: "shucall1.firebaseapp.com",
@@ -50,38 +47,21 @@
     appId: "1:493600891772:web:84ced7c30f7a0dd48e3af9"
   };
 
-  // Firebase 초기화
   firebase.initializeApp(firebaseConfig);
 
   const db = firebase.firestore();
   const ref = db.collection("queue").doc("current");
 
-  // 현재 번호 실시간 표시
-  ref.onSnapshot((doc) => {
-    if (doc.exists) {
-      document.getElementById("number").innerText = doc.data().number;
+  function call() {
+    const num = document.getElementById("callNumber").value;
+
+    if (!num) {
+      alert("번호를 입력하세요");
+      return;
     }
-  });
 
-  // 다음 번호
-  function nextNumber() {
-    ref.update({
-      number: firebase.firestore.FieldValue.increment(1)
-    });
-  }
-
-  // 이전 번호
-  function prevNumber() {
-    ref.update({
-      number: firebase.firestore.FieldValue.increment(-1)
-    });
-  }
-
-  // 초기화
-  function resetNumber() {
-    if (confirm("번호를 1로 초기화할까요?")) {
-      ref.set({ number: 1 });
-    }
+    ref.set({ number: Number(num) });
+    document.getElementById("callNumber").value = "";
   }
 </script>
 
