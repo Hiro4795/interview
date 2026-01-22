@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>번호 호출 관리자</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f4f6f8;
+      text-align: center;
+      margin: 0;
+      padding: 20px;
+    }
+    h1 { font-size: 36px; }
+
+    input {
+      font-size: 24px;
+      width: 100px;
+      margin: 5px;
+      text-align: center;
+    }
+    button {
+      font-size: 22px;
+      padding: 10px 20px;
+      margin: 5px;
+      cursor: pointer;
+    }
+    #numbers { margin-top: 20px; }
+    .num-btn {
+      font-size: 22px;
+      width: 60px;
+      height: 60px;
+      margin: 5px;
+    }
+    .num-btn.selected { background: #ffcc00; }
+    .num-btn:disabled {
+      background: #ccc;
+      color: #666;
+      cursor: not-allowed;
+    }
+    #pending { margin-top: 15px; font-size: 20px; }
+  </style>
+</head>
+<body>
+
+<h1>호출 번호 관리</h1>
+
+<input type="number" id="start" placeholder="시작">
+~
+<input type="number" id="end" placeholder="끝">
+<br>
+<button onclick="makeRange()">범위 생성</button>
+<button onclick="callSelected()">📢 호출</button>
+<button onclick="clearDisplay()">🧹 지우기</button>
+<button onclick="resetAll()">초기화</button>
+
+<div id="pending">선택된 번호: 없음</div>
+<div id="numbers"></div>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+
+<script>
+  const firebaseConfig = {
+    apiKey: "AIzaSyC0vy7CRKb0eCe3uflueVjVZmBbJjiL8Eo",
+    authDomain: "shucall1.firebaseapp.com",
+    projectId: "shucall1"
+  };
+
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.firestore();
+  const ref = db.collection("queue").doc("roomA");
+
+  let buttons = {};
+  let pending = [];
+  let calledAll = [];
+  let callSeq = 0;
+
+  function updatePendingView() {
+    document.getElementById("pending").innerText =
+      pending.length ? `선택된 번호: ${pending.join(", ")}` : "선택된 번호: 없음";
+  }
+
+  // ✅ 범위 생성 (수정된 핵심 부분)
+  function makeRange() {
+    const s = Number(document.getElementById("start").value);
+    const e = Number(document.getElementById("end").value);
+
+    if (!s || !e || s > e) {
+      alert("범위를 올바르게 입력하세요");
+      return;
+    }
+
+    const area = document.getElementById("numbers");
+    area.innerHTML = "";
+    buttons = {};
+    pending = [];
+    updatePendingView();
+
+    for (let i = s; i <= e; i++) {
+      const btn = document.createElement("button");
+      btn.innerText = i;
+      btn.className = "num-btn";
+      btn.onclick = () => toggleSelect(i);
+      area.appendChild(btn);
+      buttons[i] = btn;
+    }
+
+    syncButtons();
+  }
+
+  function toggleSelect(num) {
+    if (calledAll.includes(num)) return;
+
+    if (pending.includes(num)) {
+      pending = pending.filter(n => n !== num);
+      buttons[num].classList.remove("selected");
+    } else {
+      pending.push(num);
+      buttons[num].classList.add("selected");
+    }
+    updatePendingView();
+  }
+
+  function callSelected() {
+    if (pending.length === 0) {
+      alert("호출할 번호를 선택하세요");
+      return;
+    }
+
+    callSeq++;
+
+    ref.set({
+      calledAll: firebase.firestore.FieldValue.arrayUnion(...pending),
+      display: pending,
+      callSeq: callSeq
+    }, { merge: true });
+
+    pending = [];
+    updatePendingView();
+  }
+
+  function clearDisplay() {
+    ref.set({ display: [] }, { merge: true });
+  }
+
+  function resetAll() {
+    if (!confirm("전체를 초기화할까요?")) return;
+
+    callSeq = 0;
+
+    ref.set({
+      calledAll: [],
+      display: [],
+      callSeq: 0
+    });
+
+    pending = [];
+    updatePendingView();
+
+    Object.values(buttons).forEach(btn => {
+      btn.disabled = false;
+      btn.classList.remove("selected");
+    });
+  }
+
+  function syncButtons() {
+    Object.keys(buttons).forEach(num => {
+      const n = Number(num);
+      buttons[n].disabled = calledAll.includes(n);
+      buttons[n].classList.remove("selected");
+    });
+  }
+
+  // Firestore 동기화
+  ref.onSnapshot(doc => {
+    if (!doc.exists) {
+      calledAll = [];
+      callSeq = 0;
+    } else {
+      calledAll = doc.data().calledAll || [];
+      callSeq = doc.data().callSeq || 0;
+    }
+    syncButtons();
+  });
+</script>
+
+</body>
+</html>
