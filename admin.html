@@ -24,27 +24,20 @@
       margin: 5px;
       cursor: pointer;
     }
-    #numbers {
-      margin-top: 20px;
-    }
+    #numbers { margin-top: 20px; }
     .num-btn {
       font-size: 22px;
       width: 60px;
       height: 60px;
       margin: 5px;
     }
-    .num-btn.selected {
-      background: #ffcc00;
-    }
+    .num-btn.selected { background: #ffcc00; }
     .num-btn:disabled {
       background: #ccc;
       color: #666;
       cursor: not-allowed;
     }
-    #pending {
-      margin-top: 15px;
-      font-size: 20px;
-    }
+    #pending { margin-top: 15px; font-size: 20px; }
   </style>
 </head>
 <body>
@@ -80,6 +73,7 @@
   let buttons = {};
   let pending = [];
   let calledAll = [];
+  let callSeq = 0;
 
   function updatePendingView() {
     document.getElementById("pending").innerText =
@@ -125,34 +119,38 @@
     updatePendingView();
   }
 
-  // 📢 호출
+  // 📢 호출 버튼 (여기서만 소리 트리거)
   function callSelected() {
     if (pending.length === 0) {
       alert("호출할 번호를 선택하세요");
       return;
     }
 
+    callSeq++;
+
     ref.set({
       calledAll: firebase.firestore.FieldValue.arrayUnion(...pending),
-      display: pending
+      display: pending,
+      callSeq: callSeq
     }, { merge: true });
 
     pending = [];
     updatePendingView();
   }
 
-  // 🧹 display만 지우기
   function clearDisplay() {
     ref.set({ display: [] }, { merge: true });
   }
 
-  // 🔁 전체 초기화
   function resetAll() {
     if (!confirm("전체를 초기화할까요?")) return;
 
+    callSeq = 0;
+
     ref.set({
       calledAll: [],
-      display: []
+      display: [],
+      callSeq: 0
     });
 
     pending = [];
@@ -172,16 +170,11 @@
     });
   }
 
-  // Firestore 감시
+  // Firestore 동기화
   ref.onSnapshot(doc => {
     if (!doc.exists) {
       calledAll = [];
+      callSeq = 0;
     } else {
       calledAll = doc.data().calledAll || [];
-    }
-    syncButtons();
-  });
-</script>
-
-</body>
-</html>
+      callSeq = doc.data().callSeq || 0;

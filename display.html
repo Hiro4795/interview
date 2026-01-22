@@ -11,20 +11,26 @@
       margin: 0;
       padding: 30px;
     }
-    h1 {
-      font-size: 40px;
-      margin-bottom: 20px;
-    }
-    #list {
-      font-size: 80px;
-      line-height: 1.4;
+    h1 { font-size: 40px; margin-bottom: 20px; }
+    #list { font-size: 80px; line-height: 1.4; }
+    #soundBtn {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      font-size: 20px;
+      padding: 8px 15px;
+      cursor: pointer;
     }
   </style>
 </head>
 <body>
 
+<button id="soundBtn" onclick="enableSound()">🔊 소리 켜기</button>
+
 <h1>호출 번호</h1>
 <div id="list">-</div>
+
+<audio id="ding" src="ding.mp3" preload="auto"></audio>
 
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
@@ -40,15 +46,46 @@
   const db = firebase.firestore();
   const ref = db.collection("queue").doc("current");
 
+  const audio = document.getElementById("ding");
+  let soundEnabled = false;
+  let lastCallSeq = 0;
+
+  function enableSound() {
+    soundEnabled = true;
+    document.getElementById("soundBtn").style.display = "none";
+
+    audio.muted = false;
+    audio.currentTime = 0;
+    audio.play().catch(() => {});
+  }
+
   ref.onSnapshot(doc => {
     const list = document.getElementById("list");
-
-    if (!doc.exists || !doc.data().display || doc.data().display.length === 0) {
+    if (!doc.exists) {
       list.innerText = "-";
       return;
     }
 
-    list.innerHTML = doc.data().display.join("<br>");
+    const data = doc.data();
+
+    // display 표시
+    if (!data.display || data.display.length === 0) {
+      list.innerText = "-";
+    } else {
+      list.innerHTML = data.display.join("<br>");
+    }
+
+    // 📢 호출 버튼 눌렀을 때만 소리 1회
+    if (
+      soundEnabled &&
+      typeof data.callSeq === "number" &&
+      data.callSeq > lastCallSeq
+    ) {
+      audio.pause();
+      audio.currentTime = 0;
+      audio.play().catch(() => {});
+      lastCallSeq = data.callSeq;
+    }
   });
 </script>
 
