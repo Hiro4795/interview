@@ -19,24 +19,12 @@
       font-size: 80px;
       line-height: 1.4;
     }
-    #soundBtn {
-      position: fixed;
-      top: 20px;
-      right: 20px;
-      font-size: 20px;
-      padding: 8px 15px;
-      cursor: pointer;
-    }
   </style>
 </head>
 <body>
 
-<button id="soundBtn" onclick="enableSound()">🔊 소리 켜기</button>
-
 <h1>호출 번호</h1>
 <div id="list">-</div>
-
-<audio id="ding" src="ding.mp3" preload="auto"></audio>
 
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
@@ -52,41 +40,15 @@
   const db = firebase.firestore();
   const ref = db.collection("queue").doc("current");
 
-  const audio = document.getElementById("ding");
-  let soundEnabled = false;
-  let lastCalled = [];
-
-  // 🔊 소리 활성화 (버튼 즉시 제거, play 성공 여부와 무관)
-  function enableSound() {
-    soundEnabled = true;
-    document.getElementById("soundBtn").style.display = "none";
-
-    audio.muted = false;
-    audio.currentTime = 0;
-    audio.play().catch(err => console.log("오디오 활성화:", err));
-  }
-
-  // Firestore 감시
   ref.onSnapshot(doc => {
     const list = document.getElementById("list");
 
-    if (!doc.exists || !doc.data().called || doc.data().called.length === 0) {
+    if (!doc.exists || !doc.data().display || doc.data().display.length === 0) {
       list.innerText = "-";
-      lastCalled = [];
       return;
     }
 
-    list.innerHTML = doc.data().called.join("<br>");
-
-    // 새 번호 추가 시 호출음
-    if (soundEnabled && doc.data().called.length > lastCalled.length) {
-      audio.pause();
-      audio.currentTime = 0;
-      audio.muted = false;
-      audio.play().catch(err => console.log("호출음 재생:", err));
-    }
-
-    lastCalled = [...doc.data().called];
+    list.innerHTML = doc.data().display.join("<br>");
   });
 </script>
 

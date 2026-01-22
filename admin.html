@@ -12,7 +12,6 @@
       padding: 20px;
     }
     h1 { font-size: 36px; }
-
     input {
       font-size: 24px;
       width: 100px;
@@ -58,6 +57,7 @@
 <br>
 <button onclick="makeRange()">범위 생성</button>
 <button onclick="callSelected()">📢 호출</button>
+<button onclick="clearDisplay()">🧹 지우기</button>
 <button onclick="resetAll()">초기화</button>
 
 <div id="pending">선택된 번호: 없음</div>
@@ -79,18 +79,16 @@
 
   let buttons = {};
   let pending = [];
-  let calledFromDB = []; // 🔥 Firestore 기준 호출 완료 목록
+  let calledAll = [];
 
   function updatePendingView() {
     document.getElementById("pending").innerText =
       pending.length ? `선택된 번호: ${pending.join(", ")}` : "선택된 번호: 없음";
   }
 
-  // 범위 생성
   function makeRange() {
     const s = Number(start.value);
     const e = Number(end.value);
-
     if (!s || !e || s > e) {
       alert("범위를 올바르게 입력하세요");
       return;
@@ -111,13 +109,11 @@
       buttons[i] = btn;
     }
 
-    // 이미 호출된 번호 비활성화
-    syncDisabledButtons();
+    syncButtons();
   }
 
-  // 번호 선택 / 해제
   function toggleSelect(num) {
-    if (calledFromDB.includes(num)) return; // 🔒 이미 호출된 번호 차단
+    if (calledAll.includes(num)) return;
 
     if (pending.includes(num)) {
       pending = pending.filter(n => n !== num);
@@ -129,7 +125,7 @@
     updatePendingView();
   }
 
-  // 호출 버튼
+  // 📢 호출
   function callSelected() {
     if (pending.length === 0) {
       alert("호출할 번호를 선택하세요");
@@ -137,18 +133,27 @@
     }
 
     ref.set({
-      called: firebase.firestore.FieldValue.arrayUnion(...pending)
+      calledAll: firebase.firestore.FieldValue.arrayUnion(...pending),
+      display: pending
     }, { merge: true });
 
     pending = [];
     updatePendingView();
   }
 
-  // 초기화
+  // 🧹 display만 지우기
+  function clearDisplay() {
+    ref.set({ display: [] }, { merge: true });
+  }
+
+  // 🔁 전체 초기화
   function resetAll() {
     if (!confirm("전체를 초기화할까요?")) return;
 
-    ref.set({ called: [] });
+    ref.set({
+      calledAll: [],
+      display: []
+    });
 
     pending = [];
     updatePendingView();
@@ -159,24 +164,22 @@
     });
   }
 
-  // 🔥 Firestore 기준으로 버튼 상태 동기화
-  function syncDisabledButtons() {
+  function syncButtons() {
     Object.keys(buttons).forEach(num => {
       const n = Number(num);
-      buttons[n].disabled = calledFromDB.includes(n);
+      buttons[n].disabled = calledAll.includes(n);
       buttons[n].classList.remove("selected");
     });
   }
 
-  // Firestore 실시간 감시
+  // Firestore 감시
   ref.onSnapshot(doc => {
-    if (!doc.exists || !doc.data().called) {
-      calledFromDB = [];
+    if (!doc.exists) {
+      calledAll = [];
     } else {
-      calledFromDB = doc.data().called;
+      calledAll = doc.data().calledAll || [];
     }
-
-    syncDisabledButtons();
+    syncButtons();
   });
 </script>
 
