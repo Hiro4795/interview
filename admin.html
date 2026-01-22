@@ -131,3 +131,59 @@
     callSeq++;
 
     ref.set({
+      calledAll: firebase.firestore.FieldValue.arrayUnion(...pending),
+      display: pending,
+      callSeq: callSeq
+    }, { merge: true });
+
+    pending = [];
+    updatePendingView();
+  }
+
+  function clearDisplay() {
+    ref.set({ display: [] }, { merge: true });
+  }
+
+  function resetAll() {
+    if (!confirm("전체를 초기화할까요?")) return;
+
+    callSeq = 0;
+
+    ref.set({
+      calledAll: [],
+      display: [],
+      callSeq: 0
+    });
+
+    pending = [];
+    updatePendingView();
+
+    Object.values(buttons).forEach(btn => {
+      btn.disabled = false;
+      btn.classList.remove("selected");
+    });
+  }
+
+  function syncButtons() {
+    Object.keys(buttons).forEach(num => {
+      const n = Number(num);
+      buttons[n].disabled = calledAll.includes(n);
+      buttons[n].classList.remove("selected");
+    });
+  }
+
+  // Firestore 동기화
+  ref.onSnapshot(doc => {
+    if (!doc.exists) {
+      calledAll = [];
+      callSeq = 0;
+    } else {
+      calledAll = doc.data().calledAll || [];
+      callSeq = doc.data().callSeq || 0;
+    }
+    syncButtons();
+  });
+</script>
+
+</body>
+</html>
