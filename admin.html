@@ -12,6 +12,7 @@
       padding: 20px;
     }
     h1 { font-size: 36px; }
+
     input {
       font-size: 24px;
       width: 100px;
@@ -80,9 +81,11 @@
       pending.length ? `선택된 번호: ${pending.join(", ")}` : "선택된 번호: 없음";
   }
 
+  // ✅ 범위 생성 (수정된 핵심 부분)
   function makeRange() {
-    const s = Number(start.value);
-    const e = Number(end.value);
+    const s = Number(document.getElementById("start").value);
+    const e = Number(document.getElementById("end").value);
+
     if (!s || !e || s > e) {
       alert("범위를 올바르게 입력하세요");
       return;
@@ -119,7 +122,6 @@
     updatePendingView();
   }
 
-  // 📢 호출 버튼 (여기서만 소리 트리거)
   function callSelected() {
     if (pending.length === 0) {
       alert("호출할 번호를 선택하세요");
@@ -129,52 +131,3 @@
     callSeq++;
 
     ref.set({
-      calledAll: firebase.firestore.FieldValue.arrayUnion(...pending),
-      display: pending,
-      callSeq: callSeq
-    }, { merge: true });
-
-    pending = [];
-    updatePendingView();
-  }
-
-  function clearDisplay() {
-    ref.set({ display: [] }, { merge: true });
-  }
-
-  function resetAll() {
-    if (!confirm("전체를 초기화할까요?")) return;
-
-    callSeq = 0;
-
-    ref.set({
-      calledAll: [],
-      display: [],
-      callSeq: 0
-    });
-
-    pending = [];
-    updatePendingView();
-
-    Object.values(buttons).forEach(btn => {
-      btn.disabled = false;
-      btn.classList.remove("selected");
-    });
-  }
-
-  function syncButtons() {
-    Object.keys(buttons).forEach(num => {
-      const n = Number(num);
-      buttons[n].disabled = calledAll.includes(n);
-      buttons[n].classList.remove("selected");
-    });
-  }
-
-  // Firestore 동기화
-  ref.onSnapshot(doc => {
-    if (!doc.exists) {
-      calledAll = [];
-      callSeq = 0;
-    } else {
-      calledAll = doc.data().calledAll || [];
-      callSeq = doc.data().callSeq || 0;
