@@ -33,10 +33,17 @@
       height: 60px;
       margin: 5px;
     }
+    .num-btn.selected {
+      background: #ffcc00;
+    }
     .num-btn:disabled {
       background: #ccc;
       color: #666;
       cursor: not-allowed;
+    }
+    #pending {
+      margin-top: 15px;
+      font-size: 20px;
     }
   </style>
 </head>
@@ -49,8 +56,10 @@
 <input type="number" id="end" placeholder="끝">
 <br>
 <button onclick="makeRange()">범위 생성</button>
-<button onclick="resetCalled()">초기화</button>
+<button onclick="callSelected()">📢 호출</button>
+<button onclick="resetAll()">초기화</button>
 
+<div id="pending">선택된 번호: 없음</div>
 <div id="numbers"></div>
 
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
@@ -68,6 +77,12 @@
   const ref = db.collection("queue").doc("current");
 
   let buttons = {};
+  let pending = []; // 🔥 임시 선택 목록
+
+  function updatePendingView() {
+    document.getElementById("pending").innerText =
+      pending.length ? `선택된 번호: ${pending.join(", ")}` : "선택된 번호: 없음";
+  }
 
   // 범위 생성
   function makeRange() {
@@ -82,46 +97,66 @@
     const area = document.getElementById("numbers");
     area.innerHTML = "";
     buttons = {};
+    pending = [];
+    updatePendingView();
 
     for (let i = s; i <= e; i++) {
       const btn = document.createElement("button");
       btn.innerText = i;
       btn.className = "num-btn";
-      btn.onclick = () => callNumber(i);
+      btn.onclick = () => toggleSelect(i);
       area.appendChild(btn);
       buttons[i] = btn;
     }
   }
 
-  // 번호 호출
-  function callNumber(num) {
+  // 번호 선택 / 해제
+  function toggleSelect(num) {
+    if (pending.includes(num)) {
+      pending = pending.filter(n => n !== num);
+      buttons[num].classList.remove("selected");
+    } else {
+      pending.push(num);
+      buttons[num].classList.add("selected");
+    }
+    updatePendingView();
+  }
+
+  // 🔔 호출 버튼 (여기서만 Firestore 반영)
+  function callSelected() {
+    if (pending.length === 0) {
+      alert("호출할 번호를 선택하세요");
+      return;
+    }
+
     ref.set({
-      called: firebase.firestore.FieldValue.arrayUnion(num)
+      called: firebase.firestore.FieldValue.arrayUnion(...pending)
     }, { merge: true });
 
-    buttons[num].disabled = true;
+    // 호출된 번호는 비활성화
+    pending.forEach(num => {
+      buttons[num].disabled = true;
+      buttons[num].classList.remove("selected");
+    });
+
+    pending = [];
+    updatePendingView();
   }
 
   // 초기화
-  function resetCalled() {
-    if (!confirm("호출 목록을 초기화할까요?")) return;
+  function resetAll() {
+    if (!confirm("전체를 초기화할까요?")) return;
 
     ref.set({ called: [] });
 
     Object.values(buttons).forEach(btn => {
       btn.disabled = false;
+      btn.classList.remove("selected");
     });
+
+    pending = [];
+    updatePendingView();
   }
-
-  // 새로고침 / 재접속 시 상태 동기화
-  ref.onSnapshot(doc => {
-    if (!doc.exists || !doc.data().called) return;
-    const called = doc.data().called;
-
-    Object.keys(buttons).forEach(num => {
-      buttons[num].disabled = called.includes(Number(num));
-    });
-  });
 </script>
 
 </body>
