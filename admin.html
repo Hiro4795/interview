@@ -12,6 +12,7 @@
       padding: 20px;
     }
     h1 { font-size: 36px; }
+
     input {
       font-size: 24px;
       width: 100px;
@@ -77,7 +78,8 @@
   const ref = db.collection("queue").doc("current");
 
   let buttons = {};
-  let pending = []; // 🔥 임시 선택 목록
+  let pending = [];
+  let calledFromDB = []; // 🔥 Firestore 기준 호출 완료 목록
 
   function updatePendingView() {
     document.getElementById("pending").innerText =
@@ -108,10 +110,15 @@
       area.appendChild(btn);
       buttons[i] = btn;
     }
+
+    // 이미 호출된 번호 비활성화
+    syncDisabledButtons();
   }
 
   // 번호 선택 / 해제
   function toggleSelect(num) {
+    if (calledFromDB.includes(num)) return; // 🔒 이미 호출된 번호 차단
+
     if (pending.includes(num)) {
       pending = pending.filter(n => n !== num);
       buttons[num].classList.remove("selected");
@@ -122,7 +129,7 @@
     updatePendingView();
   }
 
-  // 🔔 호출 버튼 (여기서만 Firestore 반영)
+  // 호출 버튼
   function callSelected() {
     if (pending.length === 0) {
       alert("호출할 번호를 선택하세요");
@@ -132,12 +139,6 @@
     ref.set({
       called: firebase.firestore.FieldValue.arrayUnion(...pending)
     }, { merge: true });
-
-    // 호출된 번호는 비활성화
-    pending.forEach(num => {
-      buttons[num].disabled = true;
-      buttons[num].classList.remove("selected");
-    });
 
     pending = [];
     updatePendingView();
@@ -149,14 +150,34 @@
 
     ref.set({ called: [] });
 
+    pending = [];
+    updatePendingView();
+
     Object.values(buttons).forEach(btn => {
       btn.disabled = false;
       btn.classList.remove("selected");
     });
-
-    pending = [];
-    updatePendingView();
   }
+
+  // 🔥 Firestore 기준으로 버튼 상태 동기화
+  function syncDisabledButtons() {
+    Object.keys(buttons).forEach(num => {
+      const n = Number(num);
+      buttons[n].disabled = calledFromDB.includes(n);
+      buttons[n].classList.remove("selected");
+    });
+  }
+
+  // Firestore 실시간 감시
+  ref.onSnapshot(doc => {
+    if (!doc.exists || !doc.data().called) {
+      calledFromDB = [];
+    } else {
+      calledFromDB = doc.data().called;
+    }
+
+    syncDisabledButtons();
+  });
 </script>
 
 </body>
