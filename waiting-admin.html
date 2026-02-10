@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>대기실 입실 확인 (Admin)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body { font-family: Arial; background:#f4f6f8; padding:20px; }
+    h1 { font-size:28px; }
+    #reader { max-width:400px; margin-bottom:15px; }
+    .box { background:#fff; padding:15px; border-radius:8px; margin-bottom:10px; }
+    .ok { border-left:6px solid #2ecc71; background:#e8f7ec; }
+    .warn { border-left:6px solid #f39c12; background:#fff4e5; }
+    .list button {
+      font-size:22px;
+      padding:10px 16px;
+      margin:6px;
+      cursor:pointer;
+    }
+  </style>
+</head>
+<body>
+
+<h1>대기실 입실 확인 (Admin)</h1>
+
+<div id="reader"></div>
+<div id="result" class="box" style="display:none;"></div>
+
+<h2>대기 중 가번호</h2>
+<div id="waitingList" class="list"></div>
+
+<script src="https://unpkg.com/html5-qrcode"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+
+<script>
+  /* 🔧 Firebase 설정 */
+  const firebaseConfig = {
+    apiKey: "본인_API_KEY",
+    authDomain: "본인_AUTH_DOMAIN",
+    projectId: "본인_PROJECT_ID"
+  };
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.firestore();
+
+  const result = document.getElementById("result");
+  const waitingList = document.getElementById("waitingList");
+
+  /* 🔔 실시간 WAITING 목록 */
+  db.collection("applicants")
+    .where("status", "==", "WAITING")
+    .orderBy("waitingAt")
+    .onSnapshot(snapshot => {
+      waitingList.innerHTML = "";
+      snapshot.forEach(doc => {
+        const data = doc.data();
+        const btn = document.createElement("button");
+        btn.textContent = data.tempNumber;
+        btn.onclick = () => callNumber(data.tempNumber);
+        waitingList.appendChild(btn);
+      });
+    });
+
+  /* 📷 QR / 바코드 스캔 */
+  const qr = new Html5Qrcode("reader");
+  qr.start(
+    { facingMode: "environment" },
+    { fps: 10, qrbox: 250 },
+    async (examNo) => {
+      qr.stop();
+      handleScan(examNo.trim());
+    }
+  );
+
+  async function handleScan(examNo) {
+    result.style.display = "block";
+    result.className = "box";
+    result.textContent = "조회 중...";
+
+    const ref = db.collection("applicants").doc(examNo);
+    const doc = await ref.get();
+
+    if (!doc.exists) {
+      show("warn", "등록되지 않은 수험번호");
+      restart();
+      return;
+    }
+
+    const data = doc.data();
+
+    if (data.status !== "CHECKED_IN") {
+      show("warn", "입구 체크인 후 입실 가능합니다");
+      restart();
+      return;
+    }
+
+    // WAITING 처리
+    await ref.update({
+      status: "WAITING",
+      waitingAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+
+    show("ok", `가번호 ${data.tempNumber} 입실 완료`);
+    restart();
+  }
+
+  function show(type, msg) {
+    result.className = "box " + type;
+    result.textContent = msg;
+  }
+
+  function restart() {
+    setTimeout(() => {
+      result.style.display = "none";
+      qr.start(
+        { facingMode: "environment" },
+        { fps: 10, qrbox: 250 },
+        (code) => {
+          qr.stop();
+          handleScan(code.trim());
+        }
+      );
+    }, 1200);
+  }
+
+  /* 🔔 호출 */
+  function callNumber(tempNumber) {
+    db.collection("queue").doc("current").set({
+      numbers: firebase.firestore.FieldValue.arrayUnion(tempNumber),
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    }, { merge:true });
+  }
+</script>
+
+</body>
+</html>
