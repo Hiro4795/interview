@@ -163,8 +163,8 @@ async function handleScan(examNo) {
     });
 
   } catch (e) {
-    console.error(e);
-    alert("처리 중 오류 발생");
+    console.error("🔥 ERROR:", e);
+    alert(e.message);
   }
 }
 
