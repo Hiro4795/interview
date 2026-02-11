@@ -29,7 +29,8 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 
-const room="면접실1";
+const urlParams = new URLSearchParams(window.location.search);
+const room = urlParams.get("room") || "면접실1";
 const numbersEl=document.getElementById("numbers");
 const sound=document.getElementById("sound");
 
