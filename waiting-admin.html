@@ -17,18 +17,11 @@ h1 { margin-bottom: 20px; }
 
 .container {
   display: grid;
-  grid-template-columns: 420px 1fr;
-  gap: 30px;
+  grid-template-columns: 1fr;
+  gap: 20px;
 }
 
-/* 왼쪽 카메라 */
-#cameraBox {
-  background: #000;
-  height: 360px;
-  border-radius: 8px;
-}
-
-/* 오른쪽 정보 */
+/* 정보 박스 */
 .infoBox {
   background: #fff;
   padding: 20px;
@@ -44,6 +37,17 @@ h1 { margin-bottom: 20px; }
   margin-bottom: 15px;
 }
 
+/* 바코드 입력 */
+#scannerInput {
+  font-size: 26px;
+  padding: 14px;
+  width: 100%;
+  box-sizing: border-box;
+  border: 3px solid #333;
+  border-radius: 6px;
+  margin-bottom: 20px;
+}
+
 /* 대기 가번호 */
 .waiting {
   margin-top: 30px;
@@ -55,12 +59,6 @@ h1 { margin-bottom: 20px; }
   margin: 6px;
   cursor: pointer;
 }
-
-/* 숨김 입력 (USB 스캐너용) */
-#scannerInput {
-  position: absolute;
-  left: -9999px;
-}
 </style>
 </head>
 
@@ -69,15 +67,21 @@ h1 { margin-bottom: 20px; }
 <h1>대기실 입실 확인 (Admin)</h1>
 
 <div class="container">
-  <!-- 왼쪽 -->
-  <div id="cameraBox"></div>
 
-  <!-- 오른쪽 -->
+  <!-- 바코드 입력 -->
+  <input
+    id="scannerInput"
+    placeholder="바코드를 스캔하세요"
+    autocomplete="off"
+  >
+
+  <!-- 수험생 정보 -->
   <div class="infoBox">
     <div><label>수험번호:</label> <span id="examNo">-</span></div>
     <div><label>이름:</label> <span id="name">-</span></div>
     <div><label>가번호:</label> <span id="tempNumber">-</span></div>
   </div>
+
 </div>
 
 <div class="waiting">
@@ -85,14 +89,13 @@ h1 { margin-bottom: 20px; }
   <div id="waitingList"></div>
 </div>
 
-<!-- USB 바코드 스캐너 입력용 -->
-<input id="scannerInput" autocomplete="off">
-
 <!-- Firebase -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 
 <script>
+console.log("waiting-admin JS loaded");
+
 /* 🔧 Firebase 설정 */
 const firebaseConfig = {
   apiKey: "본인_API_KEY",
@@ -109,49 +112,60 @@ const tempEl = document.getElementById("tempNumber");
 const waitingList = document.getElementById("waitingList");
 const scannerInput = document.getElementById("scannerInput");
 
-/* 항상 스캐너 포커스 유지 */
-function focusScanner() { scannerInput.focus(); }
-focusScanner();
-document.addEventListener("click", focusScanner);
+/* 🔒 항상 포커스 유지 (현장 안정화 핵심) */
+function keepFocus() {
+  scannerInput.focus();
+}
+keepFocus();
+document.addEventListener("click", keepFocus);
+setInterval(keepFocus, 500);
 
-/* USB 스캐너 입력 처리 */
+/* ⌨️ USB 바코드 스캐너 입력 처리 */
 scannerInput.addEventListener("keydown", async (e) => {
   if (e.key !== "Enter") return;
 
   const code = scannerInput.value.trim();
   scannerInput.value = "";
+
   if (!code) return;
 
+  console.log("SCANNED:", code);
   handleScan(code);
 });
 
 /* 스캔 처리 */
 async function handleScan(examNo) {
-  const ref = db.collection("applicants").doc(examNo);
-  const doc = await ref.get();
+  try {
+    const ref = db.collection("applicants").doc(examNo);
+    const doc = await ref.get();
 
-  if (!doc.exists) {
-    alert("등록되지 않은 수험번호");
-    return;
+    if (!doc.exists) {
+      alert("등록되지 않은 수험번호입니다");
+      return;
+    }
+
+    const data = doc.data();
+
+    if (data.status !== "CHECKED_IN") {
+      alert("입구 체크인 후 대기실 입실이 가능합니다");
+      return;
+    }
+
+    // 화면 표시
+    examNoEl.textContent = examNo;
+    nameEl.textContent = data.name;
+    tempEl.textContent = data.tempNumber;
+
+    // WAITING 처리
+    await ref.update({
+      status: "WAITING",
+      waitingAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+
+  } catch (e) {
+    console.error(e);
+    alert("처리 중 오류 발생");
   }
-
-  const data = doc.data();
-
-  if (data.status !== "CHECKED_IN") {
-    alert("입구 체크인 후 대기실 입실 가능");
-    return;
-  }
-
-  // 화면 표시
-  examNoEl.textContent = examNo;
-  nameEl.textContent = data.name;
-  tempEl.textContent = data.tempNumber;
-
-  // WAITING 처리
-  await ref.update({
-    status: "WAITING",
-    waitingAt: firebase.firestore.FieldValue.serverTimestamp()
-  });
 }
 
 /* WAITING 목록 실시간 표시 */
