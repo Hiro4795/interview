@@ -5,13 +5,13 @@
 <title>면접 호출 화면</title>
 <style>
 body{background:#000;color:#fff;text-align:center;font-family:Arial;}
-#numbers{font-size:120px;margin-top:100px;}
+#numbers{font-size:110px;margin-top:100px;}
 </style>
 </head>
 
 <body>
 
-<h1>면접실1</h1>
+<h1 id="title"></h1>
 <div id="numbers">-</div>
 
 <audio id="sound" src="https://actions.google.com/sounds/v1/alarms/beep_short.ogg"></audio>
@@ -29,8 +29,11 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 
-const urlParams = new URLSearchParams(window.location.search);
-const room = urlParams.get("room") || "면접실1";
+const urlParams=new URLSearchParams(window.location.search);
+const room=urlParams.get("room")||"면접실1";
+
+document.getElementById("title").innerText=room;
+
 const numbersEl=document.getElementById("numbers");
 const sound=document.getElementById("sound");
 
@@ -38,7 +41,7 @@ let lastLength=0;
 
 db.collection("queue").doc(room)
 .onSnapshot(doc=>{
-  if(!doc.exists)return;
+  if(!doc.exists) return;
 
   const numbers=doc.data().numbers||[];
 

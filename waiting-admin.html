@@ -3,13 +3,21 @@
 <head>
 <meta charset="UTF-8">
 <title>대기실 Admin</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <style>
 body{font-family:Arial;padding:20px;background:#f4f6f8;}
-h1{margin-bottom:20px;}
+h1{margin-bottom:15px;}
+
+#statsPanel{
+  display:flex;
+  gap:20px;
+  margin-bottom:25px;
+  font-size:16px;
+}
 
 #scannerInput{
-  font-size:22px;
+  font-size:20px;
   padding:10px;
   width:100%;
   border:3px solid #333;
@@ -22,7 +30,7 @@ h1{margin-bottom:20px;}
 h2{text-align:center;}
 
 .number{
-  font-size:20px;
+  font-size:18px;
   padding:6px 10px;
   margin:6px;
   cursor:pointer;
@@ -30,13 +38,25 @@ h2{text-align:center;}
   background:#e3e3e3;
   border-radius:6px;
 }
-button{margin-top:20px;padding:8px 14px;}
+
+button{
+  margin-top:20px;
+  padding:8px 14px;
+  font-size:15px;
+}
 </style>
 </head>
 
 <body>
 
-<h1>대기실 관리 (면접실1)</h1>
+<h1 id="title"></h1>
+
+<div id="statsPanel">
+  <div>체크인: <span id="statCheckin">0</span></div>
+  <div>대기중: <span id="statWaiting">0</span></div>
+  <div>호출완료: <span id="statCalled">0</span></div>
+  <div>면접완료: <span id="statCompleted">0</span></div>
+</div>
 
 <input id="scannerInput" placeholder="바코드를 스캔하세요" autocomplete="off">
 
@@ -67,14 +87,19 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 
+/* 🔹 URL로 방 구분 */
+const urlParams = new URLSearchParams(window.location.search);
+const room = urlParams.get("room") || "면접실1";
+document.getElementById("title").innerText = "대기실 관리 ("+room+")";
+
 const scannerInput = document.getElementById("scannerInput");
 const waitingDiv = document.getElementById("waitingList");
 const calledDiv = document.getElementById("calledList");
 
-const urlParams = new URLSearchParams(window.location.search);
-const room = urlParams.get("room") || "면접실1";
-
-document.querySelector("h1").innerText = "대기실 관리 (" + room + ")";
+const statCheckin = document.getElementById("statCheckin");
+const statWaiting = document.getElementById("statWaiting");
+const statCalled = document.getElementById("statCalled");
+const statCompleted = document.getElementById("statCompleted");
 
 /* 🔒 스캐너 포커스 유지 */
 function keepFocus(){ scannerInput.focus(); }
@@ -82,7 +107,7 @@ keepFocus();
 document.addEventListener("click", keepFocus);
 setInterval(keepFocus, 500);
 
-/* ✅ 바코드 스캔 */
+/* 🔹 스캔 처리 */
 scannerInput.addEventListener("keydown", async (e)=>{
   if(e.key !== "Enter") return;
 
@@ -114,7 +139,28 @@ scannerInput.addEventListener("keydown", async (e)=>{
   }
 });
 
-/* 🔵 WAITING 목록 */
+/* 🔹 통계 */
+db.collection("applicants")
+.where("interviewRoom","==",room)
+.onSnapshot(snapshot=>{
+
+  let checkin=0, waiting=0, called=0, completed=0;
+
+  snapshot.forEach(doc=>{
+    const status=doc.data().status;
+    if(status==="CHECKED_IN") checkin++;
+    if(status==="WAITING") waiting++;
+    if(status==="CALLED") called++;
+    if(status==="COMPLETED") completed++;
+  });
+
+  statCheckin.innerText=checkin;
+  statWaiting.innerText=waiting;
+  statCalled.innerText=called;
+  statCompleted.innerText=completed;
+});
+
+/* 🔹 WAITING 목록 */
 db.collection("applicants")
 .where("status","==","WAITING")
 .where("interviewRoom","==",room)
@@ -122,10 +168,7 @@ db.collection("applicants")
 
   waitingDiv.innerHTML="";
   let list=[];
-
-  snapshot.forEach(doc=>{
-    list.push({id:doc.id,...doc.data()});
-  });
+  snapshot.forEach(doc=> list.push({id:doc.id,...doc.data()}));
 
   list.sort((a,b)=>Number(a.tempNumber)-Number(b.tempNumber));
 
@@ -138,7 +181,7 @@ db.collection("applicants")
   });
 });
 
-/* 🔴 CALLED 목록 */
+/* 🔹 CALLED 목록 */
 db.collection("applicants")
 .where("status","==","CALLED")
 .where("interviewRoom","==",room)
@@ -146,10 +189,7 @@ db.collection("applicants")
 
   calledDiv.innerHTML="";
   let list=[];
-
-  snapshot.forEach(doc=>{
-    list.push({id:doc.id,...doc.data()});
-  });
+  snapshot.forEach(doc=> list.push({id:doc.id,...doc.data()}));
 
   list.sort((a,b)=>Number(a.tempNumber)-Number(b.tempNumber));
 
@@ -162,43 +202,29 @@ db.collection("applicants")
   });
 });
 
-/* 🔥 호출 */
+/* 🔹 호출 */
 async function callNumber(examNo,tempNumber){
+  await db.collection("applicants").doc(examNo).update({
+    status:"CALLED"
+  });
 
-  try{
-    // 1️⃣ 상태 먼저 변경
-    await db.collection("applicants").doc(examNo).update({
-      status:"CALLED"
-    });
-
-    // 2️⃣ display 배열 추가
-    await db.collection("queue").doc(room).set({
-      numbers: firebase.firestore.FieldValue.arrayUnion(tempNumber)
-    },{merge:true});
-
-  }catch(err){
-    alert("호출 오류: "+err.message);
-  }
+  await db.collection("queue").doc(room).set({
+    numbers: firebase.firestore.FieldValue.arrayUnion(tempNumber)
+  },{merge:true});
 }
 
-/* 🔁 취소 */
+/* 🔹 취소 */
 async function cancelCall(examNo,tempNumber){
+  await db.collection("applicants").doc(examNo).update({
+    status:"WAITING"
+  });
 
-  try{
-    await db.collection("applicants").doc(examNo).update({
-      status:"WAITING"
-    });
-
-    await db.collection("queue").doc(room).update({
-      numbers: firebase.firestore.FieldValue.arrayRemove(tempNumber)
-    });
-
-  }catch(err){
-    alert("취소 오류: "+err.message);
-  }
+  await db.collection("queue").doc(room).update({
+    numbers: firebase.firestore.FieldValue.arrayRemove(tempNumber)
+  });
 }
 
-/* ✅ 이동완료 */
+/* 🔹 이동완료 */
 async function completeAll(){
 
   const snapshot = await db.collection("applicants")
