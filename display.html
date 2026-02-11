@@ -1,38 +1,28 @@
 <!DOCTYPE html>
-<html lang="ko">
+<html>
 <head>
 <meta charset="UTF-8">
 <title>면접 호출 화면</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-
 <style>
 body{
-  margin:0;
   background:#000;
   color:#fff;
-  font-family:Arial;
   text-align:center;
+  font-family:Arial;
 }
-
-h1{
-  margin-top:40px;
-  font-size:40px;
-}
-
-#numbers{
-  margin-top:80px;
-  font-size:120px;
-  letter-spacing:20px;
+#number{
+  font-size:150px;
+  margin-top:120px;
 }
 </style>
 </head>
 
 <body>
 
-<h1 id="roomTitle">면접실</h1>
-<div id="numbers">-</div>
+<h1 id="roomTitle"></h1>
+<div id="number">-</div>
 
-<audio id="callSound" src="https://actions.google.com/sounds/v1/alarms/beep_short.ogg"></audio>
+<audio id="sound" src="https://actions.google.com/sounds/v1/alarms/beep_short.ogg"></audio>
 
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
@@ -51,30 +41,33 @@ firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 
 const urlParams = new URLSearchParams(window.location.search);
-const room = urlParams.get("room") || "A";
+const room = urlParams.get("room") || "면접실1";
 
-document.getElementById("roomTitle").textContent = "면접실 " + room;
+document.getElementById("roomTitle").innerText = room;
 
-const numbersEl = document.getElementById("numbers");
-const sound = document.getElementById("callSound");
+const numberEl = document.getElementById("number");
+const sound = document.getElementById("sound");
 
-let lastNumbers = [];
+let lastNumber = null;
 
 db.collection("queue").doc(room)
   .onSnapshot(doc=>{
     if(!doc.exists) return;
 
     const data = doc.data();
-    const numbers = data.numbers || [];
+    const current = data.current;
 
-    numbersEl.textContent = numbers.join("  ");
+    if(current){
+      numberEl.innerText = current;
 
-    // 새 번호 추가 시 1회 호출음
-    if(numbers.length > lastNumbers.length){
-      sound.play();
+      if(current !== lastNumber){
+        sound.play();
+      }
+    }else{
+      numberEl.innerText = "-";
     }
 
-    lastNumbers = numbers;
+    lastNumber = current;
   });
 </script>
 
