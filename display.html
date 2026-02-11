@@ -1,91 +1,80 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-  <meta charset="UTF-8">
-  <title>번호 호출 표시</title>
-  <style>
-    body {
-      background: black;
-      color: white;
-      font-family: Arial, sans-serif;
-      margin: 0;
-      padding: 30px;
-    }
-    h1 { font-size: 40px; margin-bottom: 20px; }
-    #list { font-size: 80px; line-height: 1.4; }
-    #soundBtn {
-      position: fixed;
-      top: 20px;
-      right: 20px;
-      font-size: 20px;
-      padding: 8px 15px;
-      cursor: pointer;
-    }
-  </style>
+<meta charset="UTF-8">
+<title>면접 호출 화면</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<style>
+body{
+  margin:0;
+  background:#000;
+  color:#fff;
+  font-family:Arial;
+  text-align:center;
+}
+
+h1{
+  margin-top:40px;
+  font-size:40px;
+}
+
+#numbers{
+  margin-top:80px;
+  font-size:120px;
+  letter-spacing:20px;
+}
+</style>
 </head>
+
 <body>
 
-<button id="soundBtn" onclick="enableSound()">🔊 소리 켜기</button>
+<h1 id="roomTitle">면접실</h1>
+<div id="numbers">-</div>
 
-<h1>호출 번호</h1>
-<div id="list">-</div>
-
-<audio id="ding" src="ding.mp3" preload="auto"></audio>
+<audio id="callSound" src="https://actions.google.com/sounds/v1/alarms/beep_short.ogg"></audio>
 
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 
 <script>
-  const firebaseConfig = {
-    apiKey: "AIzaSyC0vy7CRKb0eCe3uflueVjVZmBbJjiL8Eo",
-    authDomain: "shucall1.firebaseapp.com",
-    projectId: "shucall1"
-  };
+const firebaseConfig = {
+  apiKey: "AIzaSyC0vy7CRKb0eCe3uflueVjVZmBbJjiL8Eo",
+  authDomain: "shucall1.firebaseapp.com",
+  projectId: "shucall1",
+  storageBucket: "shucall1.firebasestorage.app",
+  messagingSenderId: "493600891772",
+  appId: "1:493600891772:web:84ced7c30f7a0dd48e3af9"
+};
 
-  firebase.initializeApp(firebaseConfig);
-  const db = firebase.firestore();
-  const ref = db.collection("queue").doc("current");
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
 
-  const audio = document.getElementById("ding");
-  let soundEnabled = false;
-  let lastCallSeq = 0;
+const urlParams = new URLSearchParams(window.location.search);
+const room = urlParams.get("room") || "A";
 
-  function enableSound() {
-    soundEnabled = true;
-    document.getElementById("soundBtn").style.display = "none";
+document.getElementById("roomTitle").textContent = "면접실 " + room;
 
-    audio.muted = false;
-    audio.currentTime = 0;
-    audio.play().catch(() => {});
-  }
+const numbersEl = document.getElementById("numbers");
+const sound = document.getElementById("callSound");
 
-  ref.onSnapshot(doc => {
-    const list = document.getElementById("list");
-    if (!doc.exists) {
-      list.innerText = "-";
-      return;
-    }
+let lastNumbers = [];
+
+db.collection("queue").doc(room)
+  .onSnapshot(doc=>{
+    if(!doc.exists) return;
 
     const data = doc.data();
+    const numbers = data.numbers || [];
 
-    // display 표시
-    if (!data.display || data.display.length === 0) {
-      list.innerText = "-";
-    } else {
-      list.innerHTML = data.display.join("<br>");
+    numbersEl.textContent = numbers.join("  ");
+
+    // 새 번호 추가 시 1회 호출음
+    if(numbers.length > lastNumbers.length){
+      sound.play();
     }
 
-    // 📢 호출 버튼 눌렀을 때만 소리 1회
-    if (
-      soundEnabled &&
-      typeof data.callSeq === "number" &&
-      data.callSeq > lastCallSeq
-    ) {
-      audio.pause();
-      audio.currentTime = 0;
-      audio.play().catch(() => {});
-      lastCallSeq = data.callSeq;
-    }
+    lastNumbers = numbers;
   });
 </script>
 
