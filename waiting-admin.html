@@ -1,4 +1,62 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>대기실 Admin</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<style>
+body{font-family:Arial;padding:20px;background:#f4f6f8;}
+h1{margin-bottom:20px;}
+
+#scannerInput{
+  font-size:24px;
+  padding:12px;
+  width:100%;
+  border:3px solid #333;
+  border-radius:6px;
+}
+
+.section{margin-top:30px;}
+.section h2{margin-bottom:10px;}
+
+.card{
+  background:#fff;
+  padding:8px;
+  margin:6px 0;
+  border-radius:6px;
+}
+
+button{
+  margin-left:6px;
+  padding:4px 8px;
+  cursor:pointer;
+}
+</style>
+</head>
+
+<body>
+
+<h1>대기실 관리</h1>
+
+<input id="scannerInput" placeholder="바코드를 스캔하세요" autocomplete="off">
+
+<div class="section">
+  <h2>면접실1</h2>
+  <div id="room1"></div>
+</div>
+
+<div class="section">
+  <h2>면접실2</h2>
+  <div id="room2"></div>
+</div>
+
+<!-- ✅ Firebase SDK 반드시 먼저 -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+
 <script>
+/* 🔥 Firebase 설정 */
 const firebaseConfig = {
   apiKey: "AIzaSyC0vy7CRKb0eCe3uflueVjVZmBbJjiL8Eo",
   authDomain: "shucall1.firebaseapp.com",
@@ -11,43 +69,110 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 
-/* 호출 */
-async function callNumber(examNo, tempNumber, room){
+const scannerInput = document.getElementById("scannerInput");
+const room1Div = document.getElementById("room1");
+const room2Div = document.getElementById("room2");
 
-  // 현재 호출번호 설정
+/* 포커스 유지 */
+function keepFocus(){ scannerInput.focus(); }
+keepFocus();
+document.addEventListener("click", keepFocus);
+setInterval(keepFocus, 500);
+
+/* 스캔 처리 */
+scannerInput.addEventListener("keydown", async (e)=>{
+  if(e.key !== "Enter") return;
+
+  const code = scannerInput.value.trim().toUpperCase();
+  scannerInput.value = "";
+  if(!code) return;
+
+  const ref = db.collection("applicants").doc(code);
+  const doc = await ref.get();
+
+  if(!doc.exists){
+    alert("등록되지 않은 수험번호");
+    return;
+  }
+
+  const data = doc.data();
+
+  if(data.status !== "CHECKED_IN"){
+    alert("입구 체크인 후 입실 가능");
+    return;
+  }
+
+  await ref.update({
+    status:"WAITING",
+    waitingAt:firebase.firestore.FieldValue.serverTimestamp()
+  });
+});
+
+/* WAITING 목록 표시 */
+db.collection("applicants")
+.where("status","==","WAITING")
+.onSnapshot(snapshot=>{
+  room1Div.innerHTML="";
+  room2Div.innerHTML="";
+
+  snapshot.forEach(doc=>{
+    const d = doc.data();
+
+    const card = document.createElement("div");
+    card.className="card";
+
+    card.innerHTML = `
+      가번호 ${d.tempNumber}
+      <button onclick="callNumber('${doc.id}','${d.tempNumber}','${d.interviewRoom}')">호출</button>
+    `;
+
+    if(d.interviewRoom==="면접실1"){
+      room1Div.appendChild(card);
+    }
+    else if(d.interviewRoom==="면접실2"){
+      room2Div.appendChild(card);
+    }
+  });
+});
+
+/* 호출 */
+window.callNumber = async function(examNo,tempNumber,room){
+
+  // display에 현재 번호 설정
   await db.collection("queue").doc(room).set({
     current: tempNumber
   });
 
-  // CALLED 상태 변경
+  // CALLED로 변경 → 목록 자동 제거
   await db.collection("applicants").doc(examNo).update({
     status:"CALLED"
   });
-}
+};
 
 /* 호출 취소 */
-async function cancelCall(examNo, tempNumber, room){
+window.cancelCall = async function(examNo,room){
 
-  // display 제거
   await db.collection("queue").doc(room).set({
-    current: null
+    current:null
   });
 
-  // 다시 WAITING 복귀
   await db.collection("applicants").doc(examNo).update({
     status:"WAITING"
   });
-}
+};
 
 /* 입실 완료 */
-async function completeEntry(examNo, room){
+window.completeEntry = async function(examNo,room){
 
   await db.collection("queue").doc(room).set({
-    current: null
+    current:null
   });
 
   await db.collection("applicants").doc(examNo).update({
     status:"COMPLETED"
   });
-}
+};
 </script>
+
+</body>
+</html>
