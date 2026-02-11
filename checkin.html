@@ -1,234 +1,226 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-  <meta charset="UTF-8" />
-  <title>입구 입실 확인</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta charset="UTF-8" />
+<title>입구 입실 확인</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      background: #f4f6f8;
-      margin: 0;
-      padding: 20px;
-    }
-    h1 {
-      font-size: 32px;
-      margin-bottom: 10px;
-    }
-    #camera {
-      width: 100%;
-      max-width: 480px;
-      margin: 10px 0;
-      border-radius: 8px;
-      overflow: hidden;
-    }
-    input {
-      font-size: 24px;
-      width: 100%;
-      padding: 12px;
-      margin-top: 10px;
-      box-sizing: border-box;
-    }
-    .box {
-      margin-top: 15px;
-      padding: 15px;
-      background: #fff;
-      border-radius: 8px;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-    }
-    .ok { border-left: 8px solid #2ecc71; background:#e8f7ec; }
-    .no { border-left: 8px solid #e74c3c; background:#fdecea; }
-    .warn { border-left: 8px solid #f39c12; background:#fff4e5; }
-    .big {
-      font-size: 26px;
-      font-weight: bold;
-      margin-bottom: 8px;
-    }
-    button {
-      font-size: 22px;
-      padding: 10px 18px;
-      margin-top: 10px;
-      cursor: pointer;
-    }
-  </style>
+<style>
+body {
+  font-family: Arial, sans-serif;
+  background: #f4f6f8;
+  margin: 0;
+  padding: 20px;
+}
+h1 { font-size: 32px; margin-bottom: 10px; }
+#camera {
+  width: 100%;
+  max-width: 480px;
+  margin: 10px 0;
+  border-radius: 8px;
+  overflow: hidden;
+}
+input {
+  font-size: 24px;
+  width: 100%;
+  padding: 12px;
+  margin-top: 10px;
+  box-sizing: border-box;
+}
+.box {
+  margin-top: 15px;
+  padding: 15px;
+  background: #fff;
+  border-radius: 8px;
+}
+.ok { border-left: 8px solid #2ecc71; background:#e8f7ec; }
+.no { border-left: 8px solid #e74c3c; background:#fdecea; }
+.warn { border-left: 8px solid #f39c12; background:#fff4e5; }
+.big { font-size: 26px; font-weight: bold; margin-bottom: 8px; }
+button {
+  font-size: 22px;
+  padding: 10px 18px;
+  margin-top: 10px;
+  cursor: pointer;
+}
+</style>
 </head>
 <body>
 
 <h1>입구 입실 확인</h1>
 
-<!-- 📷 카메라 스캔 영역 -->
 <div id="camera"></div>
 
-<!-- ⌨️ 수동 입력 (백업용) -->
-<input id="manual" placeholder="수험번호 직접 입력 후 Enter">
+<input id="manual" placeholder="수험번호 직접 입력 후 Enter" autocomplete="off">
 
 <div id="result" class="box" style="display:none;"></div>
 
-<!-- QuaggaJS (카메라 바코드 스캔) -->
 <script src="https://unpkg.com/@ericblade/quagga2/dist/quagga.js"></script>
-
-<!-- Firebase -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 
 <script>
-  /* 🔧 Firebase 설정 (본인 프로젝트 값으로 교체) */
-  const firebaseConfig = {
-    apiKey: "AIzaSyC0vy7CRKb0eCe3uflueVjVZmBbJjiL8Eo",
-    authDomain: "shucall1.firebaseapp.com",
-    projectId: "shucall1"
-  };
+const firebaseConfig = {
+  apiKey: "AIzaSyC0vy7CRKb0eCe3uflueVjVZmBbJjiL8Eo",
+  authDomain: "shucall1.firebaseapp.com",
+  projectId: "shucall1"
+};
 
-  firebase.initializeApp(firebaseConfig);
-  const db = firebase.firestore();
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
 
-  const result = document.getElementById("result");
-  const manual = document.getElementById("manual");
+const result = document.getElementById("result");
+const manual = document.getElementById("manual");
 
-  // 정책값: 몇 분 전부터 입실 허용
-  const ALLOW_MINUTES = 10;
+const ALLOW_MINUTES = 10;
 
-  /* ---------------- 공통 처리 함수 ---------------- */
+/* 🔥 항상 입력창 포커스 유지 */
+function keepFocus() {
+  manual.focus();
+}
+keepFocus();
+document.addEventListener("click", keepFocus);
+setInterval(keepFocus, 500);
 
-  async function handleScan(examNo) {
-    if (!examNo) return;
+/* 🔥 대문자 자동 변환 */
+manual.addEventListener("input", () => {
+  manual.value = manual.value.toUpperCase();
+});
 
-    result.style.display = "block";
-    result.className = "box";
-    result.innerHTML = "조회 중...";
+/* ---------------- 공통 처리 ---------------- */
 
-    try {
-      const ref = db.collection("applicants").doc(examNo);
-      const doc = await ref.get();
+async function handleScan(examNo) {
 
-      if (!doc.exists) {
-        showNo("등록되지 않은 수험번호입니다");
-        restartCamera();
-        return;
-      }
+  examNo = examNo.toUpperCase().trim();  // 🔥 대문자 강제
 
-      const data = doc.data();
+  if (!examNo) return;
 
-      if (data.status !== "NOT_ENTERED") {
-        showWarn(
-          "이미 입실 처리됨",
-          `면접실: ${data.interviewRoom}<br>가번호: ${data.tempNumber}`
-        );
-        restartCamera();
-        return;
-      }
+  result.style.display = "block";
+  result.className = "box";
+  result.innerHTML = "조회 중...";
 
-      // 면접 시간 계산
-      const now = new Date();
-      const [h, m] = data.interviewTime.split(":").map(Number);
-      const interviewTime = new Date();
-      interviewTime.setHours(h, m, 0, 0);
-      const allowTime = new Date(interviewTime.getTime() - ALLOW_MINUTES * 60000);
+  try {
+    const ref = db.collection("applicants").doc(examNo);
+    const doc = await ref.get();
 
-      if (now < allowTime) {
-        showNo(
-          "아직 입실 불가",
-          `면접시간: ${data.interviewTime}<br>
-           입실 가능: ${allowTime.toLocaleTimeString()}`
-        );
-        restartCamera();
-        return;
-      }
+    if (!doc.exists) {
+      showNo("등록되지 않은 수험번호입니다");
+      restartCamera();
+      return;
+    }
 
-      // 입실 가능
-      result.className = "box ok";
-      result.innerHTML = `
-        <div class="big">✔ 입실 가능</div>
-        <p>이름: ${data.name}</p>
-        <p>면접실: ${data.interviewRoom}</p>
-        <p>가번호: ${data.tempNumber}</p>
-        <button onclick="checkIn('${examNo}')">입실 처리 완료</button>
-      `;
-    } catch (e) {
-	  console.error(e);
-      alert(e.message);
-	}
+    const data = doc.data();
 
-  }
+    if (data.status !== "NOT_ENTERED") {
+      showWarn(
+        "이미 입실 처리됨",
+        `면접실: ${data.interviewRoom}<br>가번호: ${data.tempNumber}`
+      );
+      restartCamera();
+      return;
+    }
 
-  async function checkIn(examNo) {
-    await db.collection("applicants").doc(examNo).update({
-      status: "CHECKED_IN",
-      checkInAt: firebase.firestore.FieldValue.serverTimestamp()
-    });
+    const now = new Date();
+    const [h, m] = data.interviewTime.split(":").map(Number);
+    const interviewTime = new Date();
+    interviewTime.setHours(h, m, 0, 0);
+    const allowTime = new Date(interviewTime.getTime() - ALLOW_MINUTES * 60000);
+
+    if (now < allowTime) {
+      showNo(
+        "아직 입실 불가",
+        `면접시간: ${data.interviewTime}<br>
+         입실 가능: ${allowTime.toLocaleTimeString()}`
+      );
+      restartCamera();
+      return;
+    }
 
     result.className = "box ok";
     result.innerHTML = `
-      <div class="big">✔ 입실 처리 완료</div>
-      <p>대기실로 안내하세요</p>
+      <div class="big">✔ 입실 가능</div>
+      <p>이름: ${data.name}</p>
+      <p>면접실: ${data.interviewRoom}</p>
+      <p>가번호: ${data.tempNumber}</p>
+      <button onclick="checkIn('${examNo}')">입실 처리 완료</button>
     `;
-
-    setTimeout(() => restartCamera(), 1500);
+  } catch (e) {
+    console.error(e);
+    alert(e.message);
   }
+}
 
-  function showNo(title, detail="") {
-    result.className = "box no";
-    result.innerHTML = `<div class="big">❌ ${title}</div><p>${detail}</p>`;
-  }
-
-  function showWarn(title, detail="") {
-    result.className = "box warn";
-    result.innerHTML = `<div class="big">⚠ ${title}</div><p>${detail}</p>`;
-  }
-
-  /* ---------------- 수동 입력 ---------------- */
-
-  manual.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") {
-      const code = manual.value.trim();
-      manual.value = "";
-      Quagga.stop();
-      handleScan(code);
-    }
+async function checkIn(examNo) {
+  await db.collection("applicants").doc(examNo).update({
+    status: "CHECKED_IN",
+    checkInAt: firebase.firestore.FieldValue.serverTimestamp()
   });
 
-  /* ---------------- 카메라 스캔 ---------------- */
+  result.className = "box ok";
+  result.innerHTML = `
+    <div class="big">✔ 입실 처리 완료</div>
+    <p>대기실로 안내하세요</p>
+  `;
 
-  function startCamera() {
-    Quagga.init({
-      inputStream: {
-        type: "LiveStream",
-        target: document.querySelector("#camera"),
-        constraints: {
-          facingMode: "environment"
-        }
-      },
-      decoder: {
-        readers: ["code_128_reader", "code_39_reader"]
-      }
-    }, (err) => {
-      if (err) {
-        console.error(err);
-        return;
-      }
-      Quagga.start();
-    });
+  setTimeout(() => restartCamera(), 1500);
+}
 
-    Quagga.onDetected(onDetectedOnce);
-  }
+function showNo(title, detail="") {
+  result.className = "box no";
+  result.innerHTML = `<div class="big">❌ ${title}</div><p>${detail}</p>`;
+}
 
-  function onDetectedOnce(result) {
-    const code = result.codeResult.code;
-    Quagga.offDetected(onDetectedOnce);
+function showWarn(title, detail="") {
+  result.className = "box warn";
+  result.innerHTML = `<div class="big">⚠ ${title}</div><p>${detail}</p>`;
+}
+
+/* ---------------- 수동 입력 ---------------- */
+
+manual.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") {
+    const code = manual.value;
+    manual.value = "";
     Quagga.stop();
     handleScan(code);
   }
+});
 
-  function restartCamera() {
-    setTimeout(() => {
-      result.style.display = "none";
-      startCamera();
-    }, 1000);
-  }
+/* ---------------- 카메라 ---------------- */
 
-  // 최초 실행
-  startCamera();
+function startCamera() {
+  Quagga.init({
+    inputStream: {
+      type: "LiveStream",
+      target: document.querySelector("#camera"),
+      constraints: { facingMode: "environment" }
+    },
+    decoder: {
+      readers: ["code_128_reader", "code_39_reader"]
+    }
+  }, (err) => {
+    if (!err) Quagga.start();
+  });
+
+  Quagga.onDetected(onDetectedOnce);
+}
+
+function onDetectedOnce(result) {
+  const code = result.codeResult.code.toUpperCase(); // 🔥 대문자 변환
+  Quagga.offDetected(onDetectedOnce);
+  Quagga.stop();
+  handleScan(code);
+}
+
+function restartCamera() {
+  setTimeout(() => {
+    result.style.display = "none";
+    startCamera();
+    keepFocus();   // 🔥 다시 포커스
+  }, 1000);
+}
+
+startCamera();
 </script>
 
 </body>
