@@ -32,6 +32,12 @@
 <script src="https://unpkg.com/html5-qrcode"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<input
+  id="scannerInput"
+  type="text"
+  autocomplete="off"
+  style="position:absolute; left:-9999px;"
+>
 
 <script>
   /* 🔧 Firebase 설정 */
@@ -93,6 +99,25 @@
       restart();
       return;
     }
+const scannerInput = document.getElementById("scannerInput");
+
+// 항상 포커스 유지
+  function focusScanner() {
+    scannerInput.focus();
+    }
+    focusScanner();
+    document.addEventListener("click", focusScanner);
+
+// Enter 들어오면 처리
+    scannerInput.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") {
+    const code = scannerInput.value.trim();
+    scannerInput.value = "";
+    if (code) {
+    handleScan(code); // 기존 스캔 처리 함수
+    }
+  }
+});
 
     // WAITING 처리
     await ref.update({
