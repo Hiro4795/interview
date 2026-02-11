@@ -4,23 +4,15 @@
 <meta charset="UTF-8">
 <title>면접 호출 화면</title>
 <style>
-body{
-  background:#000;
-  color:#fff;
-  text-align:center;
-  font-family:Arial;
-}
-#number{
-  font-size:150px;
-  margin-top:120px;
-}
+body{background:#000;color:#fff;text-align:center;font-family:Arial;}
+#numbers{font-size:120px;margin-top:100px;}
 </style>
 </head>
 
 <body>
 
-<h1 id="roomTitle"></h1>
-<div id="number">-</div>
+<h1>면접실1</h1>
+<div id="numbers">-</div>
 
 <audio id="sound" src="https://actions.google.com/sounds/v1/alarms/beep_short.ogg"></audio>
 
@@ -37,34 +29,29 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 
-const urlParams = new URLSearchParams(window.location.search);
-const room = urlParams.get("room") || "면접실1";
+const room="면접실1";
+const numbersEl=document.getElementById("numbers");
+const sound=document.getElementById("sound");
 
-document.getElementById("roomTitle").innerText = room;
-
-const numberEl = document.getElementById("number");
-const sound = document.getElementById("sound");
-
-let lastNumber=null;
+let lastLength=0;
 
 db.collection("queue").doc(room)
 .onSnapshot(doc=>{
-  if(!doc.exists) return;
+  if(!doc.exists)return;
 
-  const data = doc.data();
-  const current = data.current;
+  const numbers=doc.data().numbers||[];
 
-  if(current){
-    numberEl.innerText=current;
-
-    if(current!==lastNumber){
-      sound.play();
-    }
+  if(numbers.length>0){
+    numbersEl.innerText=numbers.join("   ");
   }else{
-    numberEl.innerText="-";
+    numbersEl.innerText="-";
   }
 
-  lastNumber=current;
+  if(numbers.length>lastLength){
+    sound.play();
+  }
+
+  lastLength=numbers.length;
 });
 </script>
 

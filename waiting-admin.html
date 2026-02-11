@@ -3,175 +3,135 @@
 <head>
 <meta charset="UTF-8">
 <title>대기실 Admin</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <style>
 body{font-family:Arial;padding:20px;background:#f4f6f8;}
-h1{margin-bottom:20px;}
-
-#scannerInput{
-  font-size:24px;
-  padding:12px;
-  width:100%;
-  border:3px solid #333;
-  border-radius:6px;
-}
-
-.section{margin-top:30px;}
-.section h2{margin-bottom:10px;}
-
-.card{
-  background:#fff;
-  padding:8px;
-  margin:6px 0;
-  border-radius:6px;
-}
-
-button{
-  margin-left:6px;
-  padding:4px 8px;
+.container{display:flex;gap:40px;}
+.box{flex:1;background:#fff;padding:15px;border-radius:8px;}
+h2{text-align:center;}
+.number{
+  font-size:22px;
+  padding:6px;
+  margin:6px;
   cursor:pointer;
+  display:inline-block;
+  background:#e3e3e3;
+  border-radius:6px;
 }
+button{margin-top:20px;padding:8px 14px;}
 </style>
 </head>
 
 <body>
 
-<h1>대기실 관리</h1>
+<h1>대기실 관리 (면접실1)</h1>
 
-<input id="scannerInput" placeholder="바코드를 스캔하세요" autocomplete="off">
+<div class="container">
+  <div class="box">
+    <h2>호출 전</h2>
+    <div id="waitingList"></div>
+  </div>
 
-<div class="section">
-  <h2>면접실1</h2>
-  <div id="room1"></div>
+  <div class="box">
+    <h2>호출 완료</h2>
+    <div id="calledList"></div>
+  </div>
 </div>
 
-<div class="section">
-  <h2>면접실2</h2>
-  <div id="room2"></div>
-</div>
+<button onclick="completeAll()">이동완료</button>
 
-<!-- ✅ Firebase SDK 반드시 먼저 -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 
 <script>
-/* 🔥 Firebase 설정 */
 const firebaseConfig = {
   apiKey: "AIzaSyC0vy7CRKb0eCe3uflueVjVZmBbJjiL8Eo",
   authDomain: "shucall1.firebaseapp.com",
-  projectId: "shucall1",
-  storageBucket: "shucall1.firebasestorage.app",
-  messagingSenderId: "493600891772",
-  appId: "1:493600891772:web:84ced7c30f7a0dd48e3af9"
+  projectId: "shucall1"
 };
 
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 
-const scannerInput = document.getElementById("scannerInput");
-const room1Div = document.getElementById("room1");
-const room2Div = document.getElementById("room2");
+const waitingDiv = document.getElementById("waitingList");
+const calledDiv = document.getElementById("calledList");
 
-/* 포커스 유지 */
-function keepFocus(){ scannerInput.focus(); }
-keepFocus();
-document.addEventListener("click", keepFocus);
-setInterval(keepFocus, 500);
+const room = "면접실1";
 
-/* 스캔 처리 */
-scannerInput.addEventListener("keydown", async (e)=>{
-  if(e.key !== "Enter") return;
-
-  const code = scannerInput.value.trim().toUpperCase();
-  scannerInput.value = "";
-  if(!code) return;
-
-  const ref = db.collection("applicants").doc(code);
-  const doc = await ref.get();
-
-  if(!doc.exists){
-    alert("등록되지 않은 수험번호");
-    return;
-  }
-
-  const data = doc.data();
-
-  if(data.status !== "CHECKED_IN"){
-    alert("입구 체크인 후 입실 가능");
-    return;
-  }
-
-  await ref.update({
-    status:"WAITING",
-    waitingAt:firebase.firestore.FieldValue.serverTimestamp()
+/* WAITING 표시 */
+db.collection("applicants")
+.where("status","==","WAITING")
+.where("interviewRoom","==",room)
+.onSnapshot(snapshot=>{
+  waitingDiv.innerHTML="";
+  snapshot.forEach(doc=>{
+    const d = doc.data();
+    const span = document.createElement("span");
+    span.className="number";
+    span.innerText=d.tempNumber;
+    span.onclick=()=>callNumber(doc.id,d.tempNumber);
+    waitingDiv.appendChild(span);
   });
 });
 
-/* WAITING 목록 표시 */
+/* CALLED 표시 */
 db.collection("applicants")
-.where("status","==","WAITING")
+.where("status","==","CALLED")
+.where("interviewRoom","==",room)
 .onSnapshot(snapshot=>{
-  room1Div.innerHTML="";
-  room2Div.innerHTML="";
-
+  calledDiv.innerHTML="";
   snapshot.forEach(doc=>{
     const d = doc.data();
-
-    const card = document.createElement("div");
-    card.className="card";
-
-    card.innerHTML = `
-      가번호 ${d.tempNumber}
-      <button onclick="callNumber('${doc.id}','${d.tempNumber}','${d.interviewRoom}')">호출</button>
-    `;
-
-    if(d.interviewRoom==="면접실1"){
-      room1Div.appendChild(card);
-    }
-    else if(d.interviewRoom==="면접실2"){
-      room2Div.appendChild(card);
-    }
+    const span = document.createElement("span");
+    span.className="number";
+    span.innerText=d.tempNumber;
+    span.onclick=()=>cancelCall(doc.id,d.tempNumber);
+    calledDiv.appendChild(span);
   });
 });
 
 /* 호출 */
-window.callNumber = async function(examNo,tempNumber,room){
+async function callNumber(examNo,tempNumber){
 
-  // display에 현재 번호 설정
   await db.collection("queue").doc(room).set({
-    current: tempNumber
-  });
+    numbers: firebase.firestore.FieldValue.arrayUnion(tempNumber)
+  },{merge:true});
 
-  // CALLED로 변경 → 목록 자동 제거
   await db.collection("applicants").doc(examNo).update({
     status:"CALLED"
   });
-};
+}
 
-/* 호출 취소 */
-window.cancelCall = async function(examNo,room){
+/* 취소 */
+async function cancelCall(examNo,tempNumber){
 
-  await db.collection("queue").doc(room).set({
-    current:null
+  await db.collection("queue").doc(room).update({
+    numbers: firebase.firestore.FieldValue.arrayRemove(tempNumber)
   });
 
   await db.collection("applicants").doc(examNo).update({
     status:"WAITING"
   });
-};
+}
 
-/* 입실 완료 */
-window.completeEntry = async function(examNo,room){
+/* 이동완료 */
+async function completeAll(){
+
+  const snapshot = await db.collection("applicants")
+  .where("status","==","CALLED")
+  .where("interviewRoom","==",room)
+  .get();
+
+  snapshot.forEach(doc=>{
+    db.collection("applicants").doc(doc.id).update({
+      status:"COMPLETED"
+    });
+  });
 
   await db.collection("queue").doc(room).set({
-    current:null
+    numbers:[]
   });
-
-  await db.collection("applicants").doc(examNo).update({
-    status:"COMPLETED"
-  });
-};
+}
 </script>
 
 </body>
