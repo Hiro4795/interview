@@ -21,7 +21,6 @@ h1 { margin-bottom: 20px; }
   gap: 20px;
 }
 
-/* 정보 박스 */
 .infoBox {
   background: #fff;
   padding: 20px;
@@ -37,7 +36,7 @@ h1 { margin-bottom: 20px; }
   margin-bottom: 15px;
 }
 
-/* 바코드 입력 */
+/* 바코드 입력창 */
 #scannerInput {
   font-size: 26px;
   padding: 14px;
@@ -96,12 +95,13 @@ h1 { margin-bottom: 20px; }
 <script>
 console.log("waiting-admin JS loaded");
 
-/* 🔧 Firebase 설정 */
+/* 🔧 Firebase 설정 (여기에 실제 값 입력) */
 const firebaseConfig = {
   apiKey: "AIzaSyC0vy7CRKb0eCe3uflueVjVZmBbJjiL8Eo",
   authDomain: "shucall1.firebaseapp.com",
   projectId: "shucall1"
 };
+
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 
@@ -112,7 +112,7 @@ const tempEl = document.getElementById("tempNumber");
 const waitingList = document.getElementById("waitingList");
 const scannerInput = document.getElementById("scannerInput");
 
-/* 🔒 항상 포커스 유지 (현장 안정화 핵심) */
+/* 🔒 항상 포커스 유지 (현장 안정성 핵심) */
 function keepFocus() {
   scannerInput.focus();
 }
@@ -124,7 +124,11 @@ setInterval(keepFocus, 500);
 scannerInput.addEventListener("keydown", async (e) => {
   if (e.key !== "Enter") return;
 
-  const code = scannerInput.value.trim();
+  const code = scannerInput.value
+    .replace(/\uFEFF/g, "")
+    .trim()
+    .toUpperCase();  // ⭐ 대문자 변환
+
   scannerInput.value = "";
 
   if (!code) return;
@@ -133,21 +137,26 @@ scannerInput.addEventListener("keydown", async (e) => {
   handleScan(code);
 });
 
-/* 스캔 처리 */
+/* 🔎 스캔 처리 */
 async function handleScan(examNo) {
   try {
     const ref = db.collection("applicants").doc(examNo);
     const doc = await ref.get();
 
     if (!doc.exists) {
-      alert("등록되지 않은 수험번호입니다");
+      alert("등록되지 않은 수험번호입니다.");
       return;
     }
 
     const data = doc.data();
 
+    if (data.status === "WAITING") {
+      alert("이미 대기 처리된 수험생입니다.");
+      return;
+    }
+
     if (data.status !== "CHECKED_IN") {
-      alert("입구 체크인 후 대기실 입실이 가능합니다");
+      alert("입구 체크인 후 대기실 입실이 가능합니다.");
       return;
     }
 
@@ -168,7 +177,7 @@ async function handleScan(examNo) {
   }
 }
 
-/* WAITING 목록 실시간 표시 */
+/* 📋 WAITING 목록 실시간 표시 */
 db.collection("applicants")
   .where("status", "==", "WAITING")
   .orderBy("waitingAt")
@@ -183,7 +192,7 @@ db.collection("applicants")
     });
   });
 
-/* 호출 */
+/* 🔔 호출 */
 function callNumber(num) {
   db.collection("queue").doc("current").set({
     numbers: firebase.firestore.FieldValue.arrayUnion(num),
