@@ -71,7 +71,10 @@ const scannerInput = document.getElementById("scannerInput");
 const waitingDiv = document.getElementById("waitingList");
 const calledDiv = document.getElementById("calledList");
 
-const room = "면접실1";
+const urlParams = new URLSearchParams(window.location.search);
+const room = urlParams.get("room") || "면접실1";
+
+document.querySelector("h1").innerText = "대기실 관리 (" + room + ")";
 
 /* 🔒 스캐너 포커스 유지 */
 function keepFocus(){ scannerInput.focus(); }
