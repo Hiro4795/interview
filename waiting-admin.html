@@ -15,16 +15,11 @@ body {
 
 h1 { margin-bottom: 20px; }
 
-.container {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 20px;
-}
-
 .infoBox {
   background: #fff;
   padding: 20px;
   border-radius: 8px;
+  margin-top: 15px;
 }
 
 .infoBox label {
@@ -33,10 +28,9 @@ h1 { margin-bottom: 20px; }
 
 .infoBox div {
   font-size: 22px;
-  margin-bottom: 15px;
+  margin-bottom: 12px;
 }
 
-/* 바코드 입력창 */
 #scannerInput {
   font-size: 26px;
   padding: 14px;
@@ -44,10 +38,8 @@ h1 { margin-bottom: 20px; }
   box-sizing: border-box;
   border: 3px solid #333;
   border-radius: 6px;
-  margin-bottom: 20px;
 }
 
-/* 대기 가번호 */
 .waiting {
   margin-top: 30px;
 }
@@ -65,22 +57,16 @@ h1 { margin-bottom: 20px; }
 
 <h1>대기실 입실 확인 (Admin)</h1>
 
-<div class="container">
+<input
+  id="scannerInput"
+  placeholder="바코드를 스캔하세요"
+  autocomplete="off"
+>
 
-  <!-- 바코드 입력 -->
-  <input
-    id="scannerInput"
-    placeholder="바코드를 스캔하세요"
-    autocomplete="off"
-  >
-
-  <!-- 수험생 정보 -->
-  <div class="infoBox">
-    <div><label>수험번호:</label> <span id="examNo">-</span></div>
-    <div><label>이름:</label> <span id="name">-</span></div>
-    <div><label>가번호:</label> <span id="tempNumber">-</span></div>
-  </div>
-
+<div class="infoBox">
+  <div><label>수험번호:</label> <span id="examNo">-</span></div>
+  <div><label>이름:</label> <span id="name">-</span></div>
+  <div><label>가번호:</label> <span id="tempNumber">-</span></div>
 </div>
 
 <div class="waiting">
@@ -88,18 +74,21 @@ h1 { margin-bottom: 20px; }
   <div id="waitingList"></div>
 </div>
 
-<!-- Firebase -->
+<!-- Firebase compat SDK -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 
 <script>
 console.log("waiting-admin JS loaded");
 
-/* 🔧 Firebase 설정 (여기에 실제 값 입력) */
+/* 🔥 Firebase 설정 (정상 값) */
 const firebaseConfig = {
   apiKey: "AIzaSyC0vy7CRKb0eCe3uflueVjVZmBbJjiL8Eo",
   authDomain: "shucall1.firebaseapp.com",
-  projectId: "shucall1"
+  projectId: "shucall1",
+  storageBucket: "shucall1.firebasestorage.app",
+  messagingSenderId: "493600891772",
+  appId: "1:493600891772:web:84ced7c30f7a0dd48e3af9"
 };
 
 firebase.initializeApp(firebaseConfig);
@@ -112,7 +101,7 @@ const tempEl = document.getElementById("tempNumber");
 const waitingList = document.getElementById("waitingList");
 const scannerInput = document.getElementById("scannerInput");
 
-/* 🔒 항상 포커스 유지 (현장 안정성 핵심) */
+/* 항상 포커스 유지 */
 function keepFocus() {
   scannerInput.focus();
 }
@@ -120,14 +109,14 @@ keepFocus();
 document.addEventListener("click", keepFocus);
 setInterval(keepFocus, 500);
 
-/* ⌨️ USB 바코드 스캐너 입력 처리 */
+/* USB 스캐너 입력 처리 */
 scannerInput.addEventListener("keydown", async (e) => {
   if (e.key !== "Enter") return;
 
   const code = scannerInput.value
     .replace(/\uFEFF/g, "")
     .trim()
-    .toUpperCase();  // ⭐ 대문자 변환
+    .toUpperCase();
 
   scannerInput.value = "";
 
@@ -137,7 +126,7 @@ scannerInput.addEventListener("keydown", async (e) => {
   handleScan(code);
 });
 
-/* 🔎 스캔 처리 */
+/* 스캔 처리 */
 async function handleScan(examNo) {
   try {
     const ref = db.collection("applicants").doc(examNo);
@@ -160,12 +149,10 @@ async function handleScan(examNo) {
       return;
     }
 
-    // 화면 표시
     examNoEl.textContent = examNo;
     nameEl.textContent = data.name;
     tempEl.textContent = data.tempNumber;
 
-    // WAITING 처리
     await ref.update({
       status: "WAITING",
       waitingAt: firebase.firestore.FieldValue.serverTimestamp()
@@ -177,10 +164,9 @@ async function handleScan(examNo) {
   }
 }
 
-/* 📋 WAITING 목록 실시간 표시 */
+/* WAITING 목록 실시간 표시 (인덱스 없이 안정 버전) */
 db.collection("applicants")
   .where("status", "==", "WAITING")
-  .orderBy("waitingAt")
   .onSnapshot(snapshot => {
     waitingList.innerHTML = "";
     snapshot.forEach(doc => {
@@ -192,7 +178,7 @@ db.collection("applicants")
     });
   });
 
-/* 🔔 호출 */
+/* 호출 */
 function callNumber(num) {
   db.collection("queue").doc("current").set({
     numbers: firebase.firestore.FieldValue.arrayUnion(num),
