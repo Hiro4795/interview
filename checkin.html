@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-<title>입구 입실 확인</title>
+<title>입구 자동 체크인</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <style>
@@ -12,7 +12,7 @@ body{
   margin:0;
   padding:20px;
 }
-h1{font-size:30px;margin-bottom:10px;}
+h1{font-size:28px;margin-bottom:10px;}
 #camera{
   width:100%;
   max-width:480px;
@@ -25,7 +25,7 @@ input{
   width:100%;
   padding:12px;
   margin-top:10px;
-  text-transform:uppercase; /* 🔥 화면 표시도 대문자 */
+  text-transform:uppercase;
 }
 .box{
   margin-top:15px;
@@ -36,17 +36,12 @@ input{
 .ok{border-left:8px solid #2ecc71;background:#e8f7ec;}
 .no{border-left:8px solid #e74c3c;background:#fdecea;}
 .warn{border-left:8px solid #f39c12;background:#fff4e5;}
-.big{font-size:24px;font-weight:bold;margin-bottom:8px;}
-button{
-  font-size:20px;
-  padding:8px 16px;
-  margin-top:10px;
-}
+.big{font-size:22px;font-weight:bold;margin-bottom:8px;}
 </style>
 </head>
 <body>
 
-<h1>입구 입실 확인</h1>
+<h1>입구 자동 체크인</h1>
 
 <div id="camera"></div>
 <input id="manual" placeholder="수험번호 직접 입력 후 Enter" autocomplete="off">
@@ -55,7 +50,7 @@ button{
 <!-- Quagga -->
 <script src="https://unpkg.com/@ericblade/quagga2/dist/quagga.js"></script>
 
-<!-- 🔥 Firebase SDK 반드시 먼저 -->
+<!-- Firebase SDK -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 
@@ -77,9 +72,10 @@ const db = firebase.firestore();
 const manual = document.getElementById("manual");
 const result = document.getElementById("result");
 const ALLOW_MINUTES = 10;
+let processing = false;
 
 /* ========================= */
-/* 🔥 입력창 포커스 완전 고정 */
+/* 포커스 고정 */
 /* ========================= */
 function forceFocus(){
   if(document.activeElement !== manual){
@@ -91,24 +87,20 @@ document.addEventListener("click", forceFocus);
 setInterval(forceFocus, 300);
 
 /* ========================= */
-/* 🔥 입력값 항상 대문자 유지 */
+/* 입력값 항상 대문자 */
 /* ========================= */
 manual.addEventListener("input", ()=>{
   manual.value = manual.value.toUpperCase();
 });
 
 /* ========================= */
-/* 🔥 Enter 시 100% 대문자 처리 */
+/* Enter 처리 */
 /* ========================= */
 manual.addEventListener("keydown",(e)=>{
   if(e.key==="Enter"){
-
-    e.preventDefault(); // 🔥 Enter 기본동작 차단
-
-    let code = manual.value.trim().toUpperCase(); // 🔥 강제 대문자
-
+    e.preventDefault();
+    let code = manual.value.trim().toUpperCase();
     manual.value="";
-
     if(code){
       Quagga.stop();
       handleScan(code);
@@ -121,8 +113,14 @@ manual.addEventListener("keydown",(e)=>{
 /* ========================= */
 async function handleScan(code){
 
-  code = code.trim().toUpperCase(); // 🔥 최종 보장
-  if(!code) return;
+  if(processing) return;
+  processing = true;
+
+  code = code.trim().toUpperCase();
+  if(!code){
+    processing=false;
+    return;
+  }
 
   result.style.display="block";
   result.className="box";
@@ -141,7 +139,7 @@ async function handleScan(code){
     const data = doc.data();
 
     if(data.status !== "NOT_ENTERED"){
-      showWarn("이미 입실 처리됨",
+      showWarn("이미 체크인됨",
         `면접실: ${data.interviewRoom}<br>가번호: ${data.tempNumber}`);
       restartCamera();
       return;
@@ -161,35 +159,24 @@ async function handleScan(code){
       return;
     }
 
+    // 🔥 자동 체크인 처리
+    await ref.update({
+      status:"CHECKED_IN",
+      checkInAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+
     result.className="box ok";
     result.innerHTML=`
-      <div class="big">✔ 입실 가능</div>
-      <p>이름: ${data.name}</p>
-      <p>면접실: ${data.interviewRoom}</p>
-      <p>가번호: ${data.tempNumber}</p>
-      <button onclick="checkIn('${code}')">입실 처리 완료</button>
+      <div class="big">✔ 체크인 완료</div>
+      <p>${data.name}</p>
+      <p>${data.interviewRoom}</p>
+      <p>대기실로 안내하세요</p>
     `;
 
   }catch(e){
     console.error(e);
     alert(e.message);
   }
-}
-
-/* ========================= */
-/* 입실 처리 */
-/* ========================= */
-async function checkIn(code){
-  await db.collection("applicants").doc(code).update({
-    status:"CHECKED_IN",
-    checkInAt: firebase.firestore.FieldValue.serverTimestamp()
-  });
-
-  result.className="box ok";
-  result.innerHTML=`
-    <div class="big">✔ 입실 처리 완료</div>
-    <p>대기실로 안내하세요</p>
-  `;
 
   setTimeout(()=>restartCamera(),1500);
 }
@@ -225,7 +212,7 @@ function startCamera(){
 }
 
 function onDetectedOnce(res){
-  const code=res.codeResult.code.toUpperCase(); // 🔥 카메라도 대문자
+  const code=res.codeResult.code.toUpperCase();
   Quagga.offDetected(onDetectedOnce);
   Quagga.stop();
   handleScan(code);
@@ -234,8 +221,9 @@ function onDetectedOnce(res){
 function restartCamera(){
   setTimeout(()=>{
     result.style.display="none";
+    processing=false;
     startCamera();
-    manual.focus(); // 🔥 포커스 복귀
+    manual.focus();
   },1000);
 }
 
