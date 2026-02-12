@@ -16,11 +16,12 @@ body{
   align-items:center;
   justify-content:center;
   height:100vh;
+  position:relative;
 }
 
 h1{
   font-size:40px;
-  margin-bottom:30px;
+  margin-bottom:40px;
 }
 
 #numbers{
@@ -28,12 +29,25 @@ h1{
   font-weight:bold;
   letter-spacing:20px;
 }
+
+#unlockBtn{
+  position:absolute;
+  top:20px;
+  right:20px;
+  padding:10px 15px;
+  font-size:16px;
+  cursor:pointer;
+  border:none;
+  border-radius:6px;
+}
 </style>
 </head>
 <body>
 
-<h1 id="roomTitle">면접실</h1>
+<h1 id="roomTitle">면접실 호출 현황</h1>
 <div id="numbers">-</div>
+
+<button id="unlockBtn">🔊 알림음 활성화</button>
 
 <!-- Firebase SDK -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
@@ -60,23 +74,23 @@ const room = params.get("room") || "면접실1";
 document.getElementById("roomTitle").innerText = room + " 호출 현황";
 
 /* ============================= */
-/* 알림음 설정 */
+/* 🔊 알림음 설정 */
 /* ============================= */
 const audio = new Audio("ding.mp3");
 audio.preload = "auto";
 
 let audioUnlocked = false;
+const unlockBtn = document.getElementById("unlockBtn");
 
-// 🔥 사용자 첫 클릭 시 오디오 활성화 (브라우저 정책 대응)
-document.addEventListener("click", () => {
-  if(!audioUnlocked){
-    audio.play().then(()=>{
-      audio.pause();
-      audio.currentTime = 0;
-      audioUnlocked = true;
-    }).catch(()=>{});
-  }
-}, { once:true });
+unlockBtn.addEventListener("click", () => {
+  audio.play().then(()=>{
+    audio.pause();
+    audio.currentTime = 0;
+    audioUnlocked = true;
+    unlockBtn.innerText = "✅ 알림음 활성화됨";
+    unlockBtn.style.background = "#2ecc71";
+  }).catch(()=>{});
+});
 
 /* ============================= */
 /* 호출 감지 */
