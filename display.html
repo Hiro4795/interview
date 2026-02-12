@@ -1,25 +1,48 @@
 <!DOCTYPE html>
-<html>
+<html lang="ko">
 <head>
 <meta charset="UTF-8">
-<title>면접 호출 화면</title>
+<title>면접 호출 전광판</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
 <style>
-body{background:#000;color:#fff;text-align:center;font-family:Arial;}
-#numbers{font-size:110px;margin-top:100px;}
+body{
+  margin:0;
+  background:#000;
+  color:#fff;
+  font-family:Arial;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  height:100vh;
+}
+
+h1{
+  font-size:40px;
+  margin-bottom:30px;
+}
+
+#numbers{
+  font-size:100px;
+  font-weight:bold;
+  letter-spacing:20px;
+}
 </style>
 </head>
-
 <body>
 
-<h1 id="title"></h1>
+<h1 id="roomTitle">면접실</h1>
 <div id="numbers">-</div>
 
-<audio id="sound" src="https://actions.google.com/sounds/v1/alarms/beep_short.ogg"></audio>
-
+<!-- Firebase SDK -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 
 <script>
+/* ============================= */
+/* Firebase 초기화 */
+/* ============================= */
 const firebaseConfig = {
   apiKey: "AIzaSyC0vy7CRKb0eCe3uflueVjVZmBbJjiL8Eo",
   authDomain: "shucall1.firebaseapp.com",
@@ -29,34 +52,68 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 
-const urlParams=new URLSearchParams(window.location.search);
-const room=urlParams.get("room")||"면접실1";
+/* ============================= */
+/* 면접실 구분 */
+/* ============================= */
+const params = new URLSearchParams(window.location.search);
+const room = params.get("room") || "면접실1";
+document.getElementById("roomTitle").innerText = room + " 호출 현황";
 
-document.getElementById("title").innerText=room;
+/* ============================= */
+/* 알림음 설정 */
+/* ============================= */
+const audio = new Audio("ding.mp3");
+audio.preload = "auto";
 
-const numbersEl=document.getElementById("numbers");
-const sound=document.getElementById("sound");
+let audioUnlocked = false;
 
-let lastLength=0;
+// 🔥 사용자 첫 클릭 시 오디오 활성화 (브라우저 정책 대응)
+document.addEventListener("click", () => {
+  if(!audioUnlocked){
+    audio.play().then(()=>{
+      audio.pause();
+      audio.currentTime = 0;
+      audioUnlocked = true;
+    }).catch(()=>{});
+  }
+}, { once:true });
+
+/* ============================= */
+/* 호출 감지 */
+/* ============================= */
+let previousNumbers = [];
 
 db.collection("queue").doc(room)
-.onSnapshot(doc=>{
-  if(!doc.exists) return;
+  .onSnapshot(doc => {
 
-  const numbers=doc.data().numbers||[];
+    const data = doc.data();
+    const numbers = data?.numbers || [];
 
-  if(numbers.length>0){
-    numbersEl.innerText=numbers.join("   ");
+    // 🔔 새 번호가 추가되었을 때만 소리
+    if(numbers.length > previousNumbers.length){
+      if(audioUnlocked){
+        audio.currentTime = 0;
+        audio.play().catch(()=>{});
+      }
+    }
+
+    previousNumbers = [...numbers];
+
+    render(numbers);
+  });
+
+/* ============================= */
+/* 화면 표시 */
+/* ============================= */
+function render(numbers){
+  const el = document.getElementById("numbers");
+
+  if(numbers.length === 0){
+    el.innerText = "-";
   }else{
-    numbersEl.innerText="-";
+    el.innerText = numbers.join("   ");
   }
-
-  if(numbers.length>lastLength){
-    sound.play();
-  }
-
-  lastLength=numbers.length;
-});
+}
 </script>
 
 </body>
